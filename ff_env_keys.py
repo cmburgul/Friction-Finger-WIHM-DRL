@@ -4,6 +4,8 @@ import random
 import time
 from pyglet.window import key
 
+key_="ENTER"
+
 class FFEnv(object):
     viewer = None
     dt = 0.1    # refresh rate
@@ -11,6 +13,7 @@ class FFEnv(object):
     goal = {'x': 100., 'y': 100.}
     state_dim = 2
     action_dim = 2
+
 
     w0 = 25  # Object width
     wp = 50  # 
@@ -123,7 +126,7 @@ class Viewer(pyglet.window.Window):
 
     def __init__(self, ff_info, goal):
         # vsync=False to not use the monitor FPS, we can speed up training
-        super(Viewer, self).__init__(width=500, height=500, resizable=False, caption='FrictoinFinger', vsync=False)
+        super(Viewer, self).__init__(width=500, height=500, resizable=False, caption='FrictionFinger', vsync=False)
         pyglet.gl.glClearColor(1, 1, 1, 1)
         self.ff_info = ff_info
 
@@ -311,6 +314,21 @@ class Viewer(pyglet.window.Window):
         self.dispatch_event('on_draw')
         self.flip()
 
+    def on_key_press(self, symbol, modifiers):
+
+        if symbol == key.ENTER:
+            print("Enter key was pressed---------------")
+            key_ = "Enter"
+
+        elif symbol == key.RIGHT:
+            print("Right key was pressed---------------")
+            key_ = "right"
+            return "slide_right"
+
+        elif symbol == key.LEFT:
+            print("Left key was pressed----------------")
+            return "slide_left"
+
     def on_draw(self):
         self.clear()
         self.batch.draw()
@@ -360,10 +378,11 @@ if __name__ == '__main__':
     #start_time = time.time()
     while True:
         env.render()
-        env.step(env.sample_action())
+        print("The Current key_ is :", key_)
+        #env.step(env.sample_action())
 
         """
-        if (count >= 3):
+        if (count >= 10):
             break
         count += 1
         """
