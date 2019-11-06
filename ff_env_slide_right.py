@@ -3,10 +3,11 @@ import pyglet
 import random
 import time
 from pyglet.window import key
+from math import radians, degrees
 
 class FFEnv(object):
     viewer = None
-    dt = 0.01    # refresh rate
+    dt = 0.05    # refresh rate
     action_bound = [-1, 1]
     goal = {'x': 100., 'y': 100.}
     state_dim = 2
@@ -18,31 +19,47 @@ class FFEnv(object):
 
     def __init__(self):
         self.ff_info = np.zeros(2, dtype=[('d', np.float32), ('t', np.float32), ('a', np.int)])
-        self.ff_info['t'][0] = np.pi/2
-        self.ff_info['d'][0] = 35 # Min 35mm - Max 120mm
+        self.ff_info['t'][0] = radians(60)
+        self.ff_info['d'][0] = 90 # Min 35mm - Max 120mm
         self.ff_info['a'] = 0
 
     def step(self, action):
         done = False
         r = 0.
 
-        # Whichever action is given, clip it,check the limits and add the actions to that particular theta
-        # if it crosses the limits then clip it and normalize it  
-
         # Action : Sliding on Right Finger
         # Give Left Finger Pararmeters and get Right Finger Paramters -> Call slide Right finger 
         action = np.clip(action, *self.action_bound) # Clipping the action
-        self.ff_info['t'][0] += action *self.dt # Adding the action delta theta to theta_right or t_r
         
-        # Constraining the left finger movement
-        if ( self.ff_info['t'][0] > 2.443 ):# greater than 140 deg
-            self.ff_info['t'][0] = 2.443 # limit it to 140 deg
-        if ( self.ff_info['t'][0] < 0.69 ): # Lesser than 40 deg
-            self.ff_info['t'][0] = 0.69323 # limit it to 40 deg
-        
-        self.ff_info['t'][1] %= np.pi * 2 # normalize ! Why ? Need to know 
-        # Getting tl, dl by giving tr, dr
-        self.ff_info['t'][1], self.ff_info['d'][1] = self.calc_right_config(self.ff_info['t'][0], self.ff_info['d'][0]) 
+        # Creating dummy variables t0, d0, t1, d1
+        self.t0 = self.ff_info['t'][0]
+        self.d0 = self.ff_info['d'][0]
+
+        self.t0 += action * self.dt # Adding the action delta theta to theta_right or t_r
+
+        print('t0 : ', degrees(self.t0))
+        print('d0 : ', self.d0)
+
+        # Constraining the left finger to lesser than 140 deg
+        if ( self.t0 > radians(140) ):
+            action = 0
+        if (self.d0 >= float(105)):
+            action = 0
+
+        # Getting tr, dr by giving tl, d1
+        self.t1, self.d1 = self.calc_right_config(self.t0, self.d0)
+        print('dr : -----------', self.d1)
+        # Constraining t1, d1 limits
+        if ( self.d1 > float(95) ):
+            action = 0
+        if ( self.t1 <= radians(40) or self.t1 >= radians(152) ): # greater than 140 deg
+            action = 0
+
+        if (action != 0):
+            self.ff_info['t'][0] += action * self.dt  
+            #self.ff_info['t'][0] %= np.pi * 2 # normalize ! Why ? Need to know         
+            # Getting tl, dl by giving tr, dr
+            self.ff_info['t'][1], self.ff_info['d'][1] = self.calc_right_config(self.ff_info['t'][0], self.ff_info['d'][0]) 
 
         # For only sliding on left finger code we no need use ff_info['a']
         # state
@@ -62,13 +79,24 @@ class FFEnv(object):
         self.viewer.render()
 
     def calc_right_config(self, tl, dl):
+        
+        #print("tl : ", degrees(tl))
+        #print("dl : ", dl)
         d1v = np.array([dl * np.cos(tl), dl * np.sin(tl)])
-        w0v = np.array([self.w0 * np.sin(tl), self.w0 * np.cos(tl)])
+        d1v = d1v.reshape(1,2)[0]
+        #print("d1v : ", d1v)
+        w0v = np.array([self.w0 * np.sin(tl), -self.w0 * np.cos(tl)])
+        w0v = w0v.reshape(1,2)[0]
+        print("w0v : ", w0v)
         wpv = np.array([self.wp, 0.])
-        f1v = np.array([self.fw * np.sin(tl), self.fw * np.cos(tl)])
+        #print("wpv : ", wpv)
+        f1v = np.array([self.fw * np.sin(tl), -self.fw * np.cos(tl)])
+        f1v = f1v.reshape(1,2)[0]
+        #print("f1v : ", f1v)
         av = d1v + w0v + f1v - wpv
-        # Calculated Values of thetar, dr
+        #print("av :", av)
         dr = np.sqrt(float((av * av).sum() - self.fw * self.fw))
+        #print("dr :", dr)
         tr = np.arctan2(float(av[1]), float(av[0])) - np.arctan2(self.fw, dr)
         return tr, dr
 
@@ -143,14 +171,17 @@ class Viewer(pyglet.window.Window):
 
         # Calculate theta1, dl
         d1v = np.array([dl * np.cos(tl), dl * np.sin(tl)])
-        w0v = np.array([self.w0 * np.sin(tl), self.w0 * np.cos(tl)])
+        w0v = np.array([self.w0 * np.sin(tl), -self.w0 * np.cos(tl)])
+        print("w0v : ", w0v)
         wpv = np.array([self.wp, 0.])
-        f1v = np.array([self.fw * np.sin(tl), self.fw * np.cos(tl)])
+        f1v = np.array([self.fw * np.sin(tl), -self.fw * np.cos(tl)])
         av = d1v + w0v + f1v - wpv
         
         # Calculated Values of thetar, dr
         dr = np.sqrt(float((av * av).sum() - self.fw * self.fw))
         tr = np.arctan2(float(av[1]), float(av[0])) - np.arctan2(self.fw, dr)
+        #print("tr : ", degrees(tr))
+        #print("dr : ", dr)
 
         l_fw_pts = np.array([[0., 0., self.fw, self.fw], [10, 130, 130, 10], [1.0, 1.0, 1.0, 1.0]])
         r_fw_pts = np.array([[0., 0., -self.fw, -self.fw], [10, 130, 130, 10], [1.0, 1.0, 1.0, 1.0]])
@@ -209,7 +240,7 @@ if __name__ == '__main__':
     #start_time = time.time()
     while True:
         env.render()
-        env.step(env.sample_action())
+        #env.step(env.sample_action())
 
         """
         if (count >= 3):

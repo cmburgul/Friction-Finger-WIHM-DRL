@@ -19,8 +19,8 @@ class FFEnv(object):
 
     def __init__(self):
         self.ff_info = np.zeros(2, dtype=[('d', np.float32), ('t', np.float32), ('a', np.int)])
-        self.ff_info['t'][1] = radians(40) # Initialising tr in deg
-        self.ff_info['d'][1] = 105  # Initialising dr in mm
+        self.ff_info['t'][1] = radians(90) # Initialising tr in deg
+        self.ff_info['d'][1] = 100  # Initialising dr in mm
         self.ff_info['a'] = 0
 
     def step(self, action):
@@ -35,19 +35,17 @@ class FFEnv(object):
         self.t1 = self.ff_info['t'][1]
         self.d1 = self.ff_info['d'][1]
 
-        # Limit tr for 40 degrees and dr for 105mm
-        # Get tl, dl and limit tl for 140 degrees and 105mm
-        # Then take actions
+        self.t1 += action * self.dt # Adding the action delta theta to theta_right or t_r
 
-        # Constraining the right finger movement to greater than 40 deg
-        if ( (self.t1 < radians(40)) or self.d1 > float(105) ): # greater than 40 deg
+        # Constraining the right finger to greater than 40 deg
+        if ( (self.t1 < radians(40)) or (self.d1 > float(105)) ): # greater than 40 deg
             action = 0 # limit it to 40 deg
                
         # Getting tl, dl by giving tr, dr
-        self.t0, self.d0 = self.calc_left_config(self.ff_info['t'][1], self.ff_info['d'][1]) 
+        self.t0, self.d0 = self.calc_left_config(self.t1, self.d1) 
 
-        # Constraining tl, dl limit put it in a loop where you limit the action and calculate the new tl, dl  
-        if ( (self.d0 >= 105) or (self.t0 >= radians(140)) ): # Maximum limit
+        # Constraining tl, dl limits  
+        if ( (self.d0 >= float(105)) or (self.t0 >= radians(140)) ): # Maximum limit
             action = 0
         
         if (action != 0):
