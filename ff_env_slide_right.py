@@ -19,8 +19,8 @@ class FFEnv(object):
 
     def __init__(self):
         self.ff_info = np.zeros(2, dtype=[('d', np.float32), ('t', np.float32), ('a', np.int)])
-        self.ff_info['t'][0] = radians(60)
-        self.ff_info['d'][0] = 90 # Min 35mm - Max 120mm
+        self.ff_info['t'][0] = radians(110)
+        self.ff_info['d'][0] = 80 # Min 35mm - Max 120mm
         self.ff_info['a'] = 0
 
     def step(self, action):
@@ -41,7 +41,7 @@ class FFEnv(object):
         print('d0 : ', self.d0)
 
         # Constraining the left finger to lesser than 140 deg
-        if ( self.t0 > radians(140) ):
+        if ( self.t0 >= radians(140) ):
             action = 0
         if (self.d0 >= float(105)):
             action = 0
@@ -50,7 +50,7 @@ class FFEnv(object):
         self.t1, self.d1 = self.calc_right_config(self.t0, self.d0)
         print('dr : -----------', self.d1)
         # Constraining t1, d1 limits
-        if ( self.d1 > float(95) ):
+        if ( self.d1 >= float(105) ):
             action = 0
         if ( self.t1 <= radians(40) or self.t1 >= radians(152) ): # greater than 140 deg
             action = 0
@@ -79,24 +79,15 @@ class FFEnv(object):
         self.viewer.render()
 
     def calc_right_config(self, tl, dl):
-        
-        #print("tl : ", degrees(tl))
-        #print("dl : ", dl)
         d1v = np.array([dl * np.cos(tl), dl * np.sin(tl)])
         d1v = d1v.reshape(1,2)[0]
-        #print("d1v : ", d1v)
         w0v = np.array([self.w0 * np.sin(tl), -self.w0 * np.cos(tl)])
         w0v = w0v.reshape(1,2)[0]
-        print("w0v : ", w0v)
         wpv = np.array([self.wp, 0.])
-        #print("wpv : ", wpv)
         f1v = np.array([self.fw * np.sin(tl), -self.fw * np.cos(tl)])
         f1v = f1v.reshape(1,2)[0]
-        #print("f1v : ", f1v)
         av = d1v + w0v + f1v - wpv
-        #print("av :", av)
         dr = np.sqrt(float((av * av).sum() - self.fw * self.fw))
-        #print("dr :", dr)
         tr = np.arctan2(float(av[1]), float(av[0])) - np.arctan2(self.fw, dr)
         return tr, dr
 
@@ -165,10 +156,10 @@ class Viewer(pyglet.window.Window):
         pts = np.transpose([[pts_new[0, :]], [pts_new[1, :]]])
         pts = pts.reshape((4, 2))
         obj_center = np.vstack([x_square, y_square])
+        
         return pts*2.5, obj_center*2.5
 
     def slide_Right_fingers(self, tl, dl):
-
         # Calculate theta1, dl
         d1v = np.array([dl * np.cos(tl), dl * np.sin(tl)])
         w0v = np.array([self.w0 * np.sin(tl), -self.w0 * np.cos(tl)])
@@ -180,8 +171,6 @@ class Viewer(pyglet.window.Window):
         # Calculated Values of thetar, dr
         dr = np.sqrt(float((av * av).sum() - self.fw * self.fw))
         tr = np.arctan2(float(av[1]), float(av[0])) - np.arctan2(self.fw, dr)
-        #print("tr : ", degrees(tr))
-        #print("dr : ", dr)
 
         l_fw_pts = np.array([[0., 0., self.fw, self.fw], [10, 130, 130, 10], [1.0, 1.0, 1.0, 1.0]])
         r_fw_pts = np.array([[0., 0., -self.fw, -self.fw], [10, 130, 130, 10], [1.0, 1.0, 1.0, 1.0]])
@@ -196,8 +185,7 @@ class Viewer(pyglet.window.Window):
         # Plotting the fingers
         fw_1 = np.transpose([[pts_fw1[0, :]], [pts_fw1[1, :]]]).reshape((4, 2))
         fw_2 = np.transpose([[pts_fw2[0, :]], [pts_fw2[1, :]]]).reshape((4, 2))
-        #print("fw_1 :", fw_1)
-        #print("fw_2 :", fw_2)
+        
         return fw_1*2.5, fw_2*2.5
 
     def render(self):
@@ -240,7 +228,7 @@ if __name__ == '__main__':
     #start_time = time.time()
     while True:
         env.render()
-        #env.step(env.sample_action())
+        env.step(env.sample_action())
 
         """
         if (count >= 3):
