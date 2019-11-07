@@ -7,7 +7,7 @@ from math import radians, degrees
 
 class FFEnv(object):
     viewer = None
-    dt = 0.01    # refresh rate
+    dt = 1    # refresh rate
     action_bound = [-1, 1]
     goal = {'x': 100., 'y': 100.} # Goal poistion of the Object need to be marked Green
     state_dim = 2
@@ -19,9 +19,11 @@ class FFEnv(object):
 
     def __init__(self):
         self.ff_info = np.zeros(2, dtype=[('d', np.float32), ('t', np.float32), ('a', np.int)])
-        self.ff_info['t'][1] = radians(90) # Initialising tr in deg
-        self.ff_info['d'][1] = 20 # Initialising dr in mm
+        self.ff_info['t'][1] = radians(90)     # Initialising tr in deg
+        self.ff_info['d'][1] = 50              # Initialising dr in mm
+        self.ff_info['t'][0], self.ff_info['d'][0] = self.calc_left_config(self.ff_info['t'][1], self.ff_info['d'][1])
         self.ff_info['a'] = 0
+        print('Initial ff_info : ', self.ff_info)
         
     def step(self, action):
         done = False
@@ -31,13 +33,11 @@ class FFEnv(object):
         # action[0] != 0 (action is left)
         # action[1] != 0 (action is right)
         # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-        print("action : ", action)
-        print("ff_info : ", self.ff_info)
         if (action[0] != 0 and action[1] == 0): # Action is sliding on left finger
             print("Action sliding Left")
             self.ff_info['a'][0] = 1 
             self.ff_info['a'][1] = 0
-            # Creating dummy variables t0, d0, t1 , d1
+            # Creating dummy variables t0, d0, t1, d1
             self.t1 = self.ff_info['t'][1]
             self.d1 = self.ff_info['d'][1]
             
@@ -53,11 +53,15 @@ class FFEnv(object):
             # Constraining tl, dl limits  
             if ( (self.d0 >= float(105)) or (self.t0 >= radians(140)) ): # Maximum limit
                 action[0] = 0
+
+            if (action[0] == 0):
+                print("Crossing limits so action[0] = 0")    
             
-            if (action[0] != 0):
+            elif (action[0] != 0):
+                print("Action taken")
                 action[0] = np.clip(action[0], *self.action_bound) # Clipping the action
                 self.ff_info['t'][1] += action[0] * self.dt # Adding the action delta theta to theta_right or t_r
-                self.ff_info['t'][1] %= np.pi * 2 # normalize ! Why ? Need to know
+                #self.ff_info['t'][1] %= np.pi * 2 # normalize ! Why ? Need to know
                 # Getting tl, dl by giving tr, dr
                 self.ff_info['t'][0], self.ff_info['d'][0] = self.calc_left_config(self.ff_info['t'][1], self.ff_info['d'][1])   
         
@@ -79,14 +83,18 @@ class FFEnv(object):
 
             # Getting tr, dr by giving tl, d1
             self.t1, self.d1 = self.calc_right_config(self.t0, self.d0)
-            #print('dr : -----------', self.d1)
+
             # Constraining t1, d1 limits
             if ( self.d1 >= float(105) ):
                 action[1] = 0
             if ( self.t1 <= radians(40) or self.t1 >= radians(152) ): # greater than 140 deg
                 action[1] = 0
 
+            if (action[1] == 0):
+                print("Crossing limits so action[1] = 0") 
+
             if (action[1] != 0):
+                print("Action taken")
                 action[1] = np.clip(action[1], *self.action_bound) # Clipping the action
                 self.ff_info['t'][1] += action[1] * self.dt  
                 #self.ff_info['t'][1] %= np.pi * 2 # normalize ! Why ? Need to know         
@@ -110,6 +118,7 @@ class FFEnv(object):
         if self.viewer is None:
             self.viewer = Viewer(self.ff_info, self.goal)
         self.viewer.render()
+        print('===============x================x====================x====================')
 
     def calc_left_config(self, tr, dr):
         d2v = np.array([dr * np.cos(np.float64(tr)), dr * np.sin(np.float64(tr))])
@@ -141,10 +150,12 @@ class FFEnv(object):
         list_i = random.choice(list_)         # Randomly select from list_
         action_i = np.random.rand(1) - 0.5    # Take a random action
         action = np.zeros(2)                  # Initialising actions with zeros  
+        print('Sampled an action')
         if (list_i == 0):                       
             action[0] = action_i
         else:
             action[1] = action_i
+        print('action :', action)
         return action
 
 class Viewer(pyglet.window.Window):
@@ -157,10 +168,10 @@ class Viewer(pyglet.window.Window):
         super(Viewer, self).__init__(width=500, height=500, resizable=False, caption='FrictoinFinger', vsync=False)
         pyglet.gl.glClearColor(1, 1, 1, 1)
         self.ff_info = ff_info
-        self.center_coord = np.array([200, 0]) 
+        self.center_coord = np.array([100, 0]) 
 
-        self.obj_pos, obj_center = self.slide_Left_obj(self.ff_info['t'][1], self.ff_info['d'][1]) + self.center_coord
-        self.finger_l, self.finger_r = self.slide_Left_fingers(self.ff_info['t'][1], self.ff_info['d'][1]) + self.center_coord
+        self.obj_pos, self.obj_center = self.slide_Left_obj(self.ff_info['t'][1], self.ff_info['d'][1]) #+ self.center_coord
+        self.finger_l, self.finger_r = self.slide_Left_fingers(self.ff_info['t'][1], self.ff_info['d'][1]) #+ self.center_coord
 
         self.batch = pyglet.graphics.Batch()  # display whole batch at once
 
@@ -302,42 +313,34 @@ class Viewer(pyglet.window.Window):
  
     def _update_finger(self):
         
-        print("ff_info['a'] ---------------: ", self.ff_info['a'])
-
         # Check action in ff_info['a'] and visualize based on it
         if (self.ff_info['a'][0] != 0 and self.ff_info['a'][1] == 0): # Action is sliding on left finger
-            obj_pos_, obj_center = self.slide_Left_obj(self.ff_info['t'][1], self.ff_info['d'][1]) + self.center_coord
-            finger_l_, finger_r_ = self.slide_Left_fingers(self.ff_info['t'][1], self.ff_info['d'][1]) + self.center_coord            
+            obj_pos_, obj_center = self.slide_Left_obj(self.ff_info['t'][1], self.ff_info['d'][1]) #+ self.center_coord
+            finger_l_, finger_r_ = self.slide_Left_fingers(self.ff_info['t'][1], self.ff_info['d'][1])# + self.center_coord            
         elif (self.ff_info['a'][1] != 0 and self.ff_info['a'][0] == 0): # Action is sliding on right finger
-            obj_pos_, obj_center = self.slide_Right_obj(self.ff_info['t'][1], self.ff_info['d'][1]) + self.center_coord
-            finger_l_, finger_r_ = self.slide_Right_fingers(self.ff_info['t'][1], self.ff_info['d'][1]) + self.center_coord
+            obj_pos_, obj_center = self.slide_Right_obj(self.ff_info['t'][1], self.ff_info['d'][1]) #+ self.center_coord
+            finger_l_, finger_r_ = self.slide_Right_fingers(self.ff_info['t'][1], self.ff_info['d'][1]) #+ self.center_coord
         else:    
             print("ff_info['a'] : [0 0]")
-            obj_pos_, obj_center = self.slide_Right_obj(self.ff_info['t'][1], self.ff_info['d'][1]) + self.center_coord
-            finger_l_, finger_r_ = self.slide_Right_fingers(self.ff_info['t'][1], self.ff_info['d'][1]) + self.center_coord
+            obj_pos_, obj_center = self.slide_Right_obj(self.ff_info['t'][1], self.ff_info['d'][1]) #+ self.center_coord
+            finger_l_, finger_r_ = self.slide_Right_fingers(self.ff_info['t'][1], self.ff_info['d'][1]) #+ self.center_coord
 
-        """
-        # Action is Sliding on Left finger
-        #print('Actuating Left Finger')
-        obj_pos_, obj_center = self.slide_Left_obj(self.ff_info['t'][1], self.ff_info['d'][1])
-        finger_l_, finger_r_ = self.slide_Left_fingers(self.ff_info['t'][1], self.ff_info['d'][1])
-        """
-        #obj_pos_ += self.center_coord
-        #finger_l_ += self.center_coord
-        #finger_r_ += self.center_coord
+        obj_pos_ += self.center_coord
+        finger_l_ += self.center_coord
+        finger_r_ += self.center_coord
 
-        self.object.vertices = np.hstack([obj_pos_[1][0], obj_pos_[1][1],         
-                                      obj_pos_[0][0], obj_pos_[0][1],
-                                      obj_pos_[3][0], obj_pos_[3][1],
-                                      obj_pos_[2][0], obj_pos_[2][1]])
-        self.finger_l.vertices = np.hstack([finger_l_[3][0], finger_l_[3][1],
-                                                 finger_l_[2][0], finger_l_[2][1],
-                                                 finger_l_[1][0], finger_l_[1][1],
-                                                 finger_l_[0][0], finger_l_[0][1]])
-        self.finger_r.vertices = np.hstack([finger_r_[3][0], finger_r_[3][1],
-                                                 finger_r_[2][0], finger_r_[2][1],
-                                                 finger_r_[1][0], finger_r_[1][1],
-                                                 finger_r_[0][0], finger_r_[0][1]])
+        self.object.vertices = np.hstack([obj_pos_[1][0] + self.center_coord[0], obj_pos_[1][1],         
+                                      obj_pos_[0][0] + self.center_coord[0], obj_pos_[0][1],
+                                      obj_pos_[3][0] + self.center_coord[0], obj_pos_[3][1],
+                                      obj_pos_[2][0] + self.center_coord[0], obj_pos_[2][1]])
+        self.finger_l.vertices = np.hstack([finger_l_[3][0] + self.center_coord[0], finger_l_[3][1],
+                                                 finger_l_[2][0] + self.center_coord[0], finger_l_[2][1],
+                                                 finger_l_[1][0] + self.center_coord[0], finger_l_[1][1],
+                                                 finger_l_[0][0] + self.center_coord[0], finger_l_[0][1]])
+        self.finger_r.vertices = np.hstack([finger_r_[3][0] + self.center_coord[0], finger_r_[3][1],
+                                                 finger_r_[2][0] + self.center_coord[0], finger_r_[2][1],
+                                                 finger_r_[1][0] + self.center_coord[0], finger_r_[1][1],
+                                                 finger_r_[0][0] + self.center_coord[0], finger_r_[0][1]])
 
 if __name__ == '__main__':
     env = FFEnv()
@@ -345,7 +348,7 @@ if __name__ == '__main__':
     while True:
         env.render()
         env.step(env.sample_action())
-        if (count >= 3):
+        if (count >= 4):
             break
         count += 1        
         
