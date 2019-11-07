@@ -7,7 +7,7 @@ from math import radians, degrees
 
 class FFEnv(object):
     viewer = None
-    dt = 1    # refresh rate
+    dt = 0.01    # refresh rate
     action_bound = [-1, 1]
     goal = {'x': 100., 'y': 100.} # Goal poistion of the Object need to be marked Green
     state_dim = 2
@@ -44,15 +44,24 @@ class FFEnv(object):
             self.t1 += action[0] * self.dt # Adding the action delta theta to theta_right or t_r
 
             # Constraining the right finger to greater than 40 deg
-            if ( (self.t1 < radians(40)) or (self.d1 > float(105)) ): # greater than 40 deg
+            if (self.t1 < radians(40)):   # greater than 40 deg
                 action[0] = 0 # limit it to 40 deg
-                
+                print("Crossing limits t1 < 40")
+            if (self.d1 >= float(105)):
+                action[0] = 0 # limit it to 105 mm
+                print("Crossing limits d1 > 105")
+
             # Getting tl, dl by giving tr, dr
             self.t0, self.d0 = self.calc_left_config(self.t1, self.d1) 
 
             # Constraining tl, dl limits  
-            if ( (self.d0 >= float(105)) or (self.t0 >= radians(140)) ): # Maximum limit
+            if (self.d0 >= float(105)): # Maximum limit
                 action[0] = 0
+                print("Crossing limits d0 > 105")
+            if (self.t0 >= radians(140)): # Limit t0 at 140 deg
+                action[0] = 0
+                print("Crossing limits t0 > 140")
+
 
             if (action[0] == 0):
                 print("Crossing limits so action[0] = 0")    
@@ -78,8 +87,10 @@ class FFEnv(object):
             # Constraining the left finger to lesser than 140 deg
             if ( self.t0 >= radians(140) ):
                 action[1] = 0
+                print("Crossing limits t0 >= 140")
             if (self.d0 >= float(105)):
                 action[1] = 0
+                print("Crossing limits d0 >= 105")
 
             # Getting tr, dr by giving tl, d1
             self.t1, self.d1 = self.calc_right_config(self.t0, self.d0)
@@ -87,11 +98,13 @@ class FFEnv(object):
             # Constraining t1, d1 limits
             if ( self.d1 >= float(105) ):
                 action[1] = 0
+                print("Crossing limits d1 >= 105")
             if ( self.t1 <= radians(40) or self.t1 >= radians(152) ): # greater than 140 deg
                 action[1] = 0
+                print("Crossing limits t1 <= 40")
 
             if (action[1] == 0):
-                print("Crossing limits so action[1] = 0") 
+                print(" So action[1] = 0") 
 
             if (action[1] != 0):
                 print("Action taken")
@@ -230,8 +243,6 @@ class Viewer(pyglet.window.Window):
         # Calculated Values of theta1, dl
         dl = np.sqrt(float((av * av).sum() - self.fw * self.fw))
         tl = np.arctan2(float(av[1]), float(av[0])) + np.arctan2(self.fw, dl)
-        #print("tl : ", degrees(tl))
-        #print("dl : ", dl)
         l_fw_pts = np.array([[0., 0., self.fw, self.fw], [10, 130, 130, 10], [1.0, 1.0, 1.0, 1.0]])
         r_fw_pts = np.array([[0., 0., -self.fw, -self.fw], [10, 130, 130, 10], [1.0, 1.0, 1.0, 1.0]])
         # Transformation matrices for the finger width
@@ -245,8 +256,7 @@ class Viewer(pyglet.window.Window):
         # Plotting the fingers
         fw_1 = np.transpose([[pts_fw1[0, :]], [pts_fw1[1, :]]]).reshape((4, 2))
         fw_2 = np.transpose([[pts_fw2[0, :]], [pts_fw2[1, :]]]).reshape((4, 2))
-        #print("fw_1 :", fw_1)
-        #print("fw_2 :", fw_2)
+        
         return fw_1*2.5, fw_2*2.5
 
     def slide_Right_obj(self,tl, dl):
@@ -348,7 +358,7 @@ if __name__ == '__main__':
     while True:
         env.render()
         env.step(env.sample_action())
-        if (count >= 4):
+        if (count >= 50):
             break
-        count += 1        
+        #count += 1        
         
