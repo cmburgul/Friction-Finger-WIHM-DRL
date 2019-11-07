@@ -7,7 +7,7 @@ from math import radians, degrees
 
 class FFEnv(object):
     viewer = None
-    dt = 0.05    # refresh rate
+    dt = 0.01    # refresh rate
     action_bound = [-1, 1]
     goal = {'x': 100., 'y': 100.} # Goal poistion of the Object need to be marked Green
     state_dim = 2
@@ -20,7 +20,7 @@ class FFEnv(object):
     def __init__(self):
         self.ff_info = np.zeros(2, dtype=[('d', np.float32), ('t', np.float32), ('a', np.int)])
         self.ff_info['t'][1] = radians(90) # Initialising tr in deg
-        self.ff_info['d'][1] = 100  # Initialising dr in mm
+        self.ff_info['d'][1] = 20 # Initialising dr in mm
         self.ff_info['a'] = 0
         
     def step(self, action):
@@ -32,7 +32,11 @@ class FFEnv(object):
         # action[1] != 0 (action is right)
         # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         print("action : ", action)
+        print("ff_info : ", self.ff_info)
         if (action[0] != 0 and action[1] == 0): # Action is sliding on left finger
+            print("Action sliding Left")
+            self.ff_info['a'][0] = 1 
+            self.ff_info['a'][1] = 0
             # Creating dummy variables t0, d0, t1 , d1
             self.t1 = self.ff_info['t'][1]
             self.d1 = self.ff_info['d'][1]
@@ -55,17 +59,17 @@ class FFEnv(object):
                 self.ff_info['t'][1] += action[0] * self.dt # Adding the action delta theta to theta_right or t_r
                 self.ff_info['t'][1] %= np.pi * 2 # normalize ! Why ? Need to know
                 # Getting tl, dl by giving tr, dr
-                self.ff_info['t'][0], self.ff_info['d'][0] = self.calc_left_config(self.ff_info['t'][1], self.ff_info['d'][1])             
+                self.ff_info['t'][0], self.ff_info['d'][0] = self.calc_left_config(self.ff_info['t'][1], self.ff_info['d'][1])   
         
         elif (action[1] != 0 and action[0] == 0): # Action is sliding on right finger
+            print("Action Sliding Right")
+            self.ff_info['a'][0] = 0 
+            self.ff_info['a'][1] = 1
             # Creating dummy variables t0, d0, t1, d1
             self.t0 = self.ff_info['t'][0]
             self.d0 = self.ff_info['d'][0]
 
             self.t0 += action[1] * self.dt # Adding the action delta theta to theta_right or t_r
-
-            print('t0 : ', degrees(self.t0))
-            print('d0 : ', self.d0)
 
             # Constraining the left finger to lesser than 140 deg
             if ( self.t0 >= radians(140) ):
@@ -75,7 +79,7 @@ class FFEnv(object):
 
             # Getting tr, dr by giving tl, d1
             self.t1, self.d1 = self.calc_right_config(self.t0, self.d0)
-            print('dr : -----------', self.d1)
+            #print('dr : -----------', self.d1)
             # Constraining t1, d1 limits
             if ( self.d1 >= float(105) ):
                 action[1] = 0
@@ -84,11 +88,12 @@ class FFEnv(object):
 
             if (action[1] != 0):
                 action[1] = np.clip(action[1], *self.action_bound) # Clipping the action
-                self.ff_info['t'][0] += action[1] * self.dt  
-                #self.ff_info['t'][0] %= np.pi * 2 # normalize ! Why ? Need to know         
+                self.ff_info['t'][1] += action[1] * self.dt  
+                #self.ff_info['t'][1] %= np.pi * 2 # normalize ! Why ? Need to know         
                 # Getting tl, dl by giving tr, dr
-                self.ff_info['t'][1], self.ff_info['d'][1] = self.calc_right_config(self.ff_info['t'][0], self.ff_info['d'][0])             
+                self.ff_info['t'][1], self.ff_info['d'][1] = self.calc_right_config(self.ff_info['t'][0], self.ff_info['d'][0]) 
 
+        print('ff_info : ', self.ff_info)
         # For only sliding on left finger code we no need use ff_info['a']
         # state
         s = self.ff_info['t'] # As of now only consider theta in states
@@ -152,13 +157,11 @@ class Viewer(pyglet.window.Window):
         super(Viewer, self).__init__(width=500, height=500, resizable=False, caption='FrictoinFinger', vsync=False)
         pyglet.gl.glClearColor(1, 1, 1, 1)
         self.ff_info = ff_info
-
         self.center_coord = np.array([200, 0]) 
-        # Calling translateLeft_obj and translateLeft_fingers just to initialize the position of object and finger positions
-        # Seperate function
+
         self.obj_pos, obj_center = self.slide_Left_obj(self.ff_info['t'][1], self.ff_info['d'][1]) + self.center_coord
         self.finger_l, self.finger_r = self.slide_Left_fingers(self.ff_info['t'][1], self.ff_info['d'][1]) + self.center_coord
-        
+
         self.batch = pyglet.graphics.Batch()  # display whole batch at once
 
         self.object = self.batch.add(
@@ -262,7 +265,6 @@ class Viewer(pyglet.window.Window):
         # Calculate theta1, dl
         d1v = np.array([dl * np.cos(tl), dl * np.sin(tl)])
         w0v = np.array([self.w0 * np.sin(tl), -self.w0 * np.cos(tl)])
-        print("w0v : ", w0v)
         wpv = np.array([self.wp, 0.])
         f1v = np.array([self.fw * np.sin(tl), -self.fw * np.cos(tl)])
         av = d1v + w0v + f1v - wpv
@@ -299,14 +301,30 @@ class Viewer(pyglet.window.Window):
         self.batch.draw()
  
     def _update_finger(self):
+        
+        print("ff_info['a'] ---------------: ", self.ff_info['a'])
+
+        # Check action in ff_info['a'] and visualize based on it
+        if (self.ff_info['a'][0] != 0 and self.ff_info['a'][1] == 0): # Action is sliding on left finger
+            obj_pos_, obj_center = self.slide_Left_obj(self.ff_info['t'][1], self.ff_info['d'][1]) + self.center_coord
+            finger_l_, finger_r_ = self.slide_Left_fingers(self.ff_info['t'][1], self.ff_info['d'][1]) + self.center_coord            
+        elif (self.ff_info['a'][1] != 0 and self.ff_info['a'][0] == 0): # Action is sliding on right finger
+            obj_pos_, obj_center = self.slide_Right_obj(self.ff_info['t'][1], self.ff_info['d'][1]) + self.center_coord
+            finger_l_, finger_r_ = self.slide_Right_fingers(self.ff_info['t'][1], self.ff_info['d'][1]) + self.center_coord
+        else:    
+            print("ff_info['a'] : [0 0]")
+            obj_pos_, obj_center = self.slide_Right_obj(self.ff_info['t'][1], self.ff_info['d'][1]) + self.center_coord
+            finger_l_, finger_r_ = self.slide_Right_fingers(self.ff_info['t'][1], self.ff_info['d'][1]) + self.center_coord
+
+        """
         # Action is Sliding on Left finger
         #print('Actuating Left Finger')
         obj_pos_, obj_center = self.slide_Left_obj(self.ff_info['t'][1], self.ff_info['d'][1])
         finger_l_, finger_r_ = self.slide_Left_fingers(self.ff_info['t'][1], self.ff_info['d'][1])
-        
-        obj_pos_ += self.center_coord
-        finger_l_ += self.center_coord
-        finger_r_ += self.center_coord
+        """
+        #obj_pos_ += self.center_coord
+        #finger_l_ += self.center_coord
+        #finger_r_ += self.center_coord
 
         self.object.vertices = np.hstack([obj_pos_[1][0], obj_pos_[1][1],         
                                       obj_pos_[0][0], obj_pos_[0][1],
@@ -323,7 +341,11 @@ class Viewer(pyglet.window.Window):
 
 if __name__ == '__main__':
     env = FFEnv()
-
+    count = 0
     while True:
         env.render()
         env.step(env.sample_action())
+        if (count >= 3):
+            break
+        count += 1        
+        
