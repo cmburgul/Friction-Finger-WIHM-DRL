@@ -20,7 +20,7 @@ class FFEnv(object):
     def __init__(self):
         self.ff_info = np.zeros(2, dtype=[('d', np.float32), ('t', np.float32), ('a', np.int)])
         self.ff_info['t'][1] = radians(90)     # Initialising tr in deg
-        self.ff_info['d'][1] = 50              # Initialising dr in mm
+        self.ff_info['d'][1] = 30              # Initialising dr in mm
         self.ff_info['t'][0], self.ff_info['d'][0] = self.calc_left_config(self.ff_info['t'][1], self.ff_info['d'][1])
         self.ff_info['a'] = 0
         print('Initial ff_info : ', self.ff_info)
@@ -50,6 +50,9 @@ class FFEnv(object):
             if (self.d1 >= float(105)):
                 action[0] = 0 # limit it to 105 mm
                 print("Crossing limits d1 > 105")
+            if (self.d1 <= float(25)):
+                action[0] = 0 # limit it to 25 mm
+                print("Crossing limits d1 < 25")
 
             # Getting tl, dl by giving tr, dr
             self.t0, self.d0 = self.calc_left_config(self.t1, self.d1) 
@@ -58,6 +61,9 @@ class FFEnv(object):
             if (self.d0 >= float(105)): # Maximum limit
                 action[0] = 0
                 print("Crossing limits d0 > 105")
+            if (self.d0 <= float(25)):
+                action[0] = 0 # limit it to 25 mm
+                print("Crossing limits d0 < 25")
             if (self.t0 >= radians(140)): # Limit t0 at 140 deg
                 action[0] = 0
                 print("Crossing limits t0 > 140")
@@ -68,7 +74,7 @@ class FFEnv(object):
             
             elif (action[0] != 0):
                 print("Action taken")
-                action[0] = np.clip(action[0], *self.action_bound) # Clipping the action
+                action[1] = np.clip(action[0], *self.action_bound) # Clipping the action
                 self.ff_info['t'][1] += action[0] * self.dt # Adding the action delta theta to theta_right or t_r
                 #self.ff_info['t'][1] %= np.pi * 2 # normalize ! Why ? Need to know
                 # Getting tl, dl by giving tr, dr
@@ -82,6 +88,7 @@ class FFEnv(object):
             self.t0 = self.ff_info['t'][0]
             self.d0 = self.ff_info['d'][0]
 
+            action[1] = np.clip(action[1], *self.action_bound) # Clipping the action
             self.t0 += action[1] * self.dt # Adding the action delta theta to theta_right or t_r
 
             # Constraining the left finger to lesser than 140 deg
@@ -91,6 +98,9 @@ class FFEnv(object):
             if (self.d0 >= float(105)):
                 action[1] = 0
                 print("Crossing limits d0 >= 105")
+            if (self.d0 <= float(25)):
+                action[1] = 0
+                print("Crossing limits d0 <= 25")
 
             # Getting tr, dr by giving tl, d1
             self.t1, self.d1 = self.calc_right_config(self.t0, self.d0)
@@ -99,6 +109,9 @@ class FFEnv(object):
             if ( self.d1 >= float(105) ):
                 action[1] = 0
                 print("Crossing limits d1 >= 105")
+            if (self.d1 <= float(25)):
+                action[1] = 0
+                print("Crossing limits d1 <= 25")
             if ( self.t1 <= radians(40) or self.t1 >= radians(152) ): # greater than 140 deg
                 action[1] = 0
                 print("Crossing limits t1 <= 40")
@@ -108,8 +121,8 @@ class FFEnv(object):
 
             if (action[1] != 0):
                 print("Action taken")
-                action[1] = np.clip(action[1], *self.action_bound) # Clipping the action
-                self.ff_info['t'][1] += action[1] * self.dt  
+                # For sliding right take action for t0 and get tr, dr
+                self.ff_info['t'][0] += action[1] * self.dt  
                 #self.ff_info['t'][1] %= np.pi * 2 # normalize ! Why ? Need to know         
                 # Getting tl, dl by giving tr, dr
                 self.ff_info['t'][1], self.ff_info['d'][1] = self.calc_right_config(self.ff_info['t'][0], self.ff_info['d'][0]) 
