@@ -2,8 +2,10 @@ import numpy as np
 import pyglet
 import random
 import time
-from pyglet.window import key
 from math import radians, degrees
+
+MAX_OBJ_LIMIT = 105
+MIN_OBJ_LIMIT = 25
 
 class FFEnv(object):
     viewer = None
@@ -20,7 +22,7 @@ class FFEnv(object):
     def __init__(self):
         self.ff_info = np.zeros(2, dtype=[('d', np.float32), ('t', np.float32), ('a', np.int)])
         self.ff_info['t'][1] = radians(90)     # Initialising tr in deg
-        self.ff_info['d'][1] = 30              # Initialising dr in mm
+        self.ff_info['d'][1] = 35              # Initialising dr in mm
         self.ff_info['t'][0], self.ff_info['d'][0] = self.calc_left_config(self.ff_info['t'][1], self.ff_info['d'][1])
         self.ff_info['a'] = 0
         print('Initial ff_info : ', self.ff_info)
@@ -33,6 +35,7 @@ class FFEnv(object):
         # action[0] != 0 (action is left)
         # action[1] != 0 (action is right)
         # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+        print('raw action : ', action)
         if (action[0] != 0 and action[1] == 0): # Action is sliding on left finger
             print("Action sliding Left")
             self.ff_info['a'][0] = 1 
@@ -43,40 +46,40 @@ class FFEnv(object):
             
             self.t1 += action[0] * self.dt # Adding the action delta theta to theta_right or t_r
 
-            # Constraining the right finger to greater than 40 deg
-            if (self.t1 < radians(40)):   # greater than 40 deg
-                action[0] = 0 # limit it to 40 deg
+            # Constraining the right finger 
+            if (self.t1 < radians(40)):   # limit it to greater than 40 deg
+                action[0] = 0 
                 print("Crossing limits t1 < 40")
-            if (self.d1 >= float(105)):
-                action[0] = 0 # limit it to 105 mm
+            if (self.d1 >= MAX_OBJ_LIMIT):   # limit it to 105 mm 
+                action[0] = 0 
                 print("Crossing limits d1 > 105")
-            if (self.d1 <= float(25)):
-                action[0] = 0 # limit it to 25 mm
+            if (self.d1 <= MIN_OBJ_LIMIT):    # limit it to 25 mm
+                action[0] = 0 
                 print("Crossing limits d1 < 25")
 
             # Getting tl, dl by giving tr, dr
             self.t0, self.d0 = self.calc_left_config(self.t1, self.d1) 
 
             # Constraining tl, dl limits  
-            if (self.d0 >= float(105)): # Maximum limit
+            if (self.d0 >= MAX_OBJ_LIMIT): # Maximum limit
                 action[0] = 0
                 print("Crossing limits d0 > 105")
-            if (self.d0 <= float(25)):
+            if (self.d0 <= MIN_OBJ_LIMIT):
                 action[0] = 0 # limit it to 25 mm
                 print("Crossing limits d0 < 25")
             if (self.t0 >= radians(140)): # Limit t0 at 140 deg
                 action[0] = 0
                 print("Crossing limits t0 > 140")
 
-
             if (action[0] == 0):
                 print("Crossing limits so action[0] = 0")    
             
             elif (action[0] != 0):
                 print("Action taken")
-                action[1] = np.clip(action[0], *self.action_bound) # Clipping the action
+                action[0] = np.clip(action[0], *self.action_bound) # Clipping the action
                 self.ff_info['t'][1] += action[0] * self.dt # Adding the action delta theta to theta_right or t_r
                 #self.ff_info['t'][1] %= np.pi * 2 # normalize ! Why ? Need to know
+                print('delta theta : [', action[0] * self.dt, ', ', action[1], ']')
                 # Getting tl, dl by giving tr, dr
                 self.ff_info['t'][0], self.ff_info['d'][0] = self.calc_left_config(self.ff_info['t'][1], self.ff_info['d'][1])   
         
@@ -88,17 +91,17 @@ class FFEnv(object):
             self.t0 = self.ff_info['t'][0]
             self.d0 = self.ff_info['d'][0]
 
-            action[1] = np.clip(action[1], *self.action_bound) # Clipping the action
+            action[1] = np.clip(action[1], * self.action_bound) # Clipping the action
             self.t0 += action[1] * self.dt # Adding the action delta theta to theta_right or t_r
 
             # Constraining the left finger to lesser than 140 deg
             if ( self.t0 >= radians(140) ):
                 action[1] = 0
                 print("Crossing limits t0 >= 140")
-            if (self.d0 >= float(105)):
+            if (self.d0 >= MAX_OBJ_LIMIT ):
                 action[1] = 0
                 print("Crossing limits d0 >= 105")
-            if (self.d0 <= float(25)):
+            if (self.d0 <= MIN_OBJ_LIMIT):
                 action[1] = 0
                 print("Crossing limits d0 <= 25")
 
@@ -106,10 +109,10 @@ class FFEnv(object):
             self.t1, self.d1 = self.calc_right_config(self.t0, self.d0)
 
             # Constraining t1, d1 limits
-            if ( self.d1 >= float(105) ):
+            if ( self.d1 >= MAX_OBJ_LIMIT ):
                 action[1] = 0
                 print("Crossing limits d1 >= 105")
-            if (self.d1 <= float(25)):
+            if (self.d1 <= MIN_OBJ_LIMIT):
                 action[1] = 0
                 print("Crossing limits d1 <= 25")
             if ( self.t1 <= radians(40) or self.t1 >= radians(152) ): # greater than 140 deg
@@ -124,6 +127,7 @@ class FFEnv(object):
                 # For sliding right take action for t0 and get tr, dr
                 self.ff_info['t'][0] += action[1] * self.dt  
                 #self.ff_info['t'][1] %= np.pi * 2 # normalize ! Why ? Need to know         
+                print('delta theta : [', action[0], ', ', action[1]* self.dt, ']')
                 # Getting tl, dl by giving tr, dr
                 self.ff_info['t'][1], self.ff_info['d'][1] = self.calc_right_config(self.ff_info['t'][0], self.ff_info['d'][0]) 
 
@@ -174,7 +178,7 @@ class FFEnv(object):
     def sample_action(self):
         list_ = [0, 1]                        # Create a list of [0, 1] [left, right]
         list_i = random.choice(list_)         # Randomly select from list_
-        action_i = np.random.rand(1) - 0.5    # Take a random action
+        action_i = np.random.rand(1) - 0.6    # Take a random action
         action = np.zeros(2)                  # Initialising actions with zeros  
         print('Sampled an action')
         if (list_i == 0):                       
@@ -369,9 +373,10 @@ if __name__ == '__main__':
     env = FFEnv()
     count = 0
     while True:
+        print("Action Iteration : ", count)
         env.render()
         env.step(env.sample_action())
-        if (count >= 50):
+        count += 1        
+        if (count >= 20):
             break
-        #count += 1        
         
