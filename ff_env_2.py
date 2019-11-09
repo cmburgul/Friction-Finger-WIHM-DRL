@@ -4,8 +4,13 @@ import random
 import time
 from math import radians, degrees
 
-MAX_OBJ_LIMIT = 105
-MIN_OBJ_LIMIT = 25
+MAX_OBJ_LIMIT = 105 # in mm
+MIN_OBJ_LIMIT = 25  # in mm
+
+# tl : theta_left
+# dl : distance from object base to left finger base
+# tr : theta_right
+# dr : distance from object base to right finger base
 
 class FFEnv(object):
     viewer = None
@@ -134,10 +139,10 @@ class FFEnv(object):
         print('ff_info : ', self.ff_info)
         # For only sliding on left finger code we no need use ff_info['a']
         # state
-        s = self.ff_info['t'] # As of now only consider theta in states
+        s = self.ff_info['t'] # States should have theta, obj_pos, goal_pos
         # done and reward
         done = False
-        r = 0. # Sparse reward
+        r = 0. # Sparse reward Calculate distance between obj_pos and goal_pos
         return s, r, done
     
     def reset(self):
@@ -178,7 +183,7 @@ class FFEnv(object):
     def sample_action(self):
         list_ = [0, 1]                        # Create a list of [0, 1] [left, right]
         list_i = random.choice(list_)         # Randomly select from list_
-        action_i = np.random.rand(1) - 0.6    # Take a random action
+        action_i = np.random.rand(1) - 0.5    # Take a random action
         action = np.zeros(2)                  # Initialising actions with zeros  
         print('Sampled an action')
         if (list_i == 0):                       
@@ -204,32 +209,41 @@ class Viewer(pyglet.window.Window):
         self.finger_l, self.finger_r = self.slide_Left_fingers(self.ff_info['t'][1], self.ff_info['d'][1]) #+ self.center_coord
 
         self.batch = pyglet.graphics.Batch()  # display whole batch at once
-
+        
+        # Object Position
         self.object = self.batch.add(
             4, pyglet.gl.GL_QUADS, None,    # 4 corners
-            ('v2f', [self.obj_pos[1][0], self.obj_pos[1][1],         # location
+            ('v2f', [self.obj_pos[1][0], self.obj_pos[1][1],     
                      self.obj_pos[0][0], self.obj_pos[0][1],
                      self.obj_pos[3][0], self.obj_pos[3][1],
                      self.obj_pos[2][0], self.obj_pos[2][1]]),
-            ('c3B', (86, 109, 249) * 4))    # color
-        
+            ('c3B', (138, 43, 226) * 4))    # color
+        # Left Finger
         self.finger_l = self.batch.add(
             4, pyglet.gl.GL_QUADS, None,
             ('v2f', [self.finger_l[3][0], self.finger_l[3][1],
                      self.finger_l[2][0], self.finger_l[2][1],
                      self.finger_l[1][0], self.finger_l[1][1],
                      self.finger_l[0][0], self.finger_l[0][1]]),
-            ('c3B', (249, 86, 86) * 4,))    # color
+            ('c3B', (255, 215, 0) * 4,))    # color
+        # Right finger
         self.finger_r = self.batch.add(
             4, pyglet.gl.GL_QUADS, None,
             ('v2f', [self.finger_r[3][0], self.finger_r[3][1],
                      self.finger_r[2][0], self.finger_r[2][1],
                      self.finger_r[1][0], self.finger_r[1][1],
                      self.finger_r[0][0], self.finger_r[0][1] ]),
-                     ('c3B', (249, 86, 86) * 4,))
+                     ('c3B', (255, 215, 0) * 4,))
+        # Goal Position of the object
+        self.obj_goal = self.batch.add(
+            4, pyglet.gl.GL_QUADS, None,
+            ('v2f', [self.obj_pos[1][0], self.obj_pos[1][1],     
+                     self.obj_pos[0][0], self.obj_pos[0][1],
+                     self.obj_pos[3][0], self.obj_pos[3][1],
+                     self.obj_pos[2][0], self.obj_pos[2][1]]),
+                     ('c3B', (124, 252, 0) * 4,))
 
     def slide_Left_obj(self,tr, dr):
-        # -------------------
         # Define :  slide the object on left finger with friction enabled on right finger and disabled on left finger
         # Input : t_right, d_right
         # Output : t_left, d_left
@@ -237,10 +251,9 @@ class Viewer(pyglet.window.Window):
         # Transformation Matrix
         x_square = self.wp + (dr + self.w0 / 2.) * np.cos(np.float64(tr)) - (self.fw + self.w0 / 2.) * np.sin(np.float64(tr)) 
         y_square = (dr + self.w0 / 2.) * np.sin(np.float64(tr)) + (self.fw + self.w0 / 2.) * np.cos(np.float64(tr))
-
         pts = np.array([[-self.w0 / 2., -self.w0 / 2., self.w0 / 2., self.w0 / 2.], [-self.w0 / 2., self.w0 / 2., self.w0 / 2., -self.w0 / 2.], [1, 1, 1, 1]])
         R = np.array([[np.cos(tr), -np.sin(tr), x_square], [np.sin(tr), np.cos(tr), y_square], [0, 0, 1]])
-
+        
         # Points after transformation
         pts_new = np.dot(R, pts)
         
@@ -248,47 +261,48 @@ class Viewer(pyglet.window.Window):
         pts = np.transpose([[pts_new[0, :]], [pts_new[1, :]]])
         pts = pts.reshape((4, 2))
         obj_center = np.vstack([x_square, y_square])
-        return pts*2.5, obj_center*2.5
+        return pts*2.5, obj_center*2.5 # *2.5 for scaling up output
 
     def slide_Left_fingers(self,tr, dr):
+        
         # Calculate thetar, dr
         d2v = np.array([dr * np.cos(np.float64(tr)), dr * np.sin(np.float64(tr))])
         w0v = np.array([self.w0 * np.sin(np.float64(tr)), -self.w0 * np.cos(np.float64(tr))])
         wpv = np.array([self.wp, 0.])
         f1v = np.array([self.fw * np.sin(np.float64(tr)), -self.fw * np.cos(np.float64(tr))])
         av = d2v - f1v - w0v + wpv
+        
         # Calculated Values of theta1, dl
         dl = np.sqrt(float((av * av).sum() - self.fw * self.fw))
         tl = np.arctan2(float(av[1]), float(av[0])) + np.arctan2(self.fw, dl)
         l_fw_pts = np.array([[0., 0., self.fw, self.fw], [10, 130, 130, 10], [1.0, 1.0, 1.0, 1.0]])
         r_fw_pts = np.array([[0., 0., -self.fw, -self.fw], [10, 130, 130, 10], [1.0, 1.0, 1.0, 1.0]])
+        
         # Transformation matrices for the finger width
         R_fw1 = [[np.cos(tl - np.pi / 2.0), -np.sin(tl - np.pi / 2), 0.0], [np.sin(tl - np.pi / 2), np.cos(tl - np.pi / 2), 0.0], [0.0, 0.0, 1.0]]
         R_fw2 = [[np.cos(tr - np.pi / 2), -np.sin(tr - np.pi / 2), self.wp], [np.sin(tr - np.pi / 2), np.cos(tr - np.pi / 2), 0.0], [0.0, 0.0, 1.0]]
-
+        
         # finger Coordinates 1-> Left, 2-> Right
         pts_fw1 = np.dot(R_fw1, l_fw_pts)
         pts_fw2 = np.dot(R_fw2, r_fw_pts)
-
+        
         # Plotting the fingers
         fw_1 = np.transpose([[pts_fw1[0, :]], [pts_fw1[1, :]]]).reshape((4, 2))
         fw_2 = np.transpose([[pts_fw2[0, :]], [pts_fw2[1, :]]]).reshape((4, 2))
         
-        return fw_1*2.5, fw_2*2.5
+        return fw_1*2.5, fw_2*2.5 # *2.5 for scaling up output
 
     def slide_Right_obj(self,tl, dl):
-        # Input : 
-        # tl : theta_left
-        # dl : left distance from object to origin
-        # Output : Left and Right Finger Position 
+        # Define :  slide the object on right finger with friction enabled on left finger and disabled on right finger
+        # Input : t_left, d_left
+        # Output : t_right, d_right
         
         # Transformation Matrix
         x_square = (dl + self.w0 / 2.) * np.cos(tl) + (self.w0 / 2. + self.fw) * np.sin(tl) # x_sq (Center of the object)
         y_square = (dl + self.w0 / 2.) * np.sin(tl) - (self.w0 / 2. + self.fw) * np.cos(tl) # y_sq (Center of the object)
-
         pts = np.array([[-self.w0 / 2., -self.w0 / 2., self.w0 / 2., self.w0 / 2.], [-self.w0 / 2., self.w0 / 2., self.w0 / 2., -self.w0 / 2.], [1, 1, 1, 1]])
         R = np.array([[np.cos(tl), -np.sin(tl), x_square], [np.sin(tl), np.cos(tl), y_square], [0, 0, 1]])
-
+        
         # Points after transformation
         pts_new = np.dot(R, pts)
         
@@ -296,10 +310,11 @@ class Viewer(pyglet.window.Window):
         pts = np.transpose([[pts_new[0, :]], [pts_new[1, :]]])
         pts = pts.reshape((4, 2))
         obj_center = np.vstack([x_square, y_square])
-        
-        return pts*2.5, obj_center*2.5
+    
+        return pts*2.5, obj_center*2.5 # *2.5 for scaling up output
 
     def slide_Right_fingers(self, tl, dl):
+        
         # Calculate theta1, dl
         d1v = np.array([dl * np.cos(tl), dl * np.sin(tl)])
         w0v = np.array([self.w0 * np.sin(tl), -self.w0 * np.cos(tl)])
@@ -325,7 +340,7 @@ class Viewer(pyglet.window.Window):
         fw_1 = np.transpose([[pts_fw1[0, :]], [pts_fw1[1, :]]]).reshape((4, 2))
         fw_2 = np.transpose([[pts_fw2[0, :]], [pts_fw2[1, :]]]).reshape((4, 2))
         
-        return fw_1*2.5, fw_2*2.5
+        return fw_1*2.5, fw_2*2.5 # *2.5 for scaling up output
 
     def render(self):
         self._update_finger()
@@ -342,19 +357,21 @@ class Viewer(pyglet.window.Window):
         
         # Check action in ff_info['a'] and visualize based on it
         if (self.ff_info['a'][0] != 0 and self.ff_info['a'][1] == 0): # Action is sliding on left finger
-            obj_pos_, obj_center = self.slide_Left_obj(self.ff_info['t'][1], self.ff_info['d'][1]) #+ self.center_coord
-            finger_l_, finger_r_ = self.slide_Left_fingers(self.ff_info['t'][1], self.ff_info['d'][1])# + self.center_coord            
+            obj_pos_, obj_center = self.slide_Left_obj(self.ff_info['t'][1], self.ff_info['d'][1]) 
+            finger_l_, finger_r_ = self.slide_Left_fingers(self.ff_info['t'][1], self.ff_info['d'][1])            
         elif (self.ff_info['a'][1] != 0 and self.ff_info['a'][0] == 0): # Action is sliding on right finger
-            obj_pos_, obj_center = self.slide_Right_obj(self.ff_info['t'][1], self.ff_info['d'][1]) #+ self.center_coord
-            finger_l_, finger_r_ = self.slide_Right_fingers(self.ff_info['t'][1], self.ff_info['d'][1]) #+ self.center_coord
+            obj_pos_, obj_center = self.slide_Right_obj(self.ff_info['t'][1], self.ff_info['d'][1]) 
+            finger_l_, finger_r_ = self.slide_Right_fingers(self.ff_info['t'][1], self.ff_info['d'][1]) 
         else:    
             print("ff_info['a'] : [0 0]")
-            obj_pos_, obj_center = self.slide_Right_obj(self.ff_info['t'][1], self.ff_info['d'][1]) #+ self.center_coord
-            finger_l_, finger_r_ = self.slide_Right_fingers(self.ff_info['t'][1], self.ff_info['d'][1]) #+ self.center_coord
+            obj_pos_, obj_center = self.slide_Right_obj(self.ff_info['t'][1], self.ff_info['d'][1]) 
+            finger_l_, finger_r_ = self.slide_Right_fingers(self.ff_info['t'][1], self.ff_info['d'][1])
 
         obj_pos_ += self.center_coord
         finger_l_ += self.center_coord
         finger_r_ += self.center_coord
+        obj_center[0][0] += self.center_coord[0]
+        obj_center[1][0] += self.center_coord[1]
 
         self.object.vertices = np.hstack([obj_pos_[1][0] + self.center_coord[0], obj_pos_[1][1],         
                                       obj_pos_[0][0] + self.center_coord[0], obj_pos_[0][1],
@@ -377,6 +394,6 @@ if __name__ == '__main__':
         env.render()
         env.step(env.sample_action())
         count += 1        
-        if (count >= 20):
-            break
+        #if (count >= 20):
+            #break
         
