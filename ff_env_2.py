@@ -2,10 +2,12 @@ import numpy as np
 import pyglet
 import random
 import time
+import matplotlib.pyplot as plt
 from math import radians, degrees
 
 MAX_OBJ_LIMIT = 105 # in mm
 MIN_OBJ_LIMIT = 25  # in mm
+obj_loc = np.array([]) # object position
 
 # tl : theta_left
 # dl : distance from object base to left finger base
@@ -16,7 +18,7 @@ class FFEnv(object):
     viewer = None
     dt = 0.01    # refresh rate
     action_bound = [-1, 1]
-    goal = {'x': 100., 'y': 100.} # Goal poistion of the Object need to be marked Green
+    goal = {'x': 100., 'y': 100.} # Goal Position of the Object 
     state_dim = 2
     action_dim = 2
 
@@ -26,9 +28,17 @@ class FFEnv(object):
 
     def __init__(self):
         self.ff_info = np.zeros(2, dtype=[('d', np.float32), ('t', np.float32), ('a', np.int)])
-        self.ff_info['t'][1] = radians(90)     # Initialising tr in deg
-        self.ff_info['d'][1] = 35              # Initialising dr in mm
+
+        # Intialising with right finger
+        self.ff_info['t'][1] = radians(64)     # Initialising tr in deg
+        self.ff_info['d'][1] = 105               # Initialising dr in mm
         self.ff_info['t'][0], self.ff_info['d'][0] = self.calc_left_config(self.ff_info['t'][1], self.ff_info['d'][1])
+        
+        # Initialising with left finger
+        #self.ff_info['t'][0] = radians(140)      # Initialising tl in deg
+        #self.ff_info['d'][0] = 105                # Initialising dl in mm
+        #self.ff_info['t'][1], self.ff_info['d'][1] = self.calc_right_config(self.ff_info['t'][0], self.ff_info['d'][0])
+
         self.ff_info['a'] = 0
         print('Initial ff_info : ', self.ff_info)
         
@@ -69,10 +79,10 @@ class FFEnv(object):
             if (self.d0 >= MAX_OBJ_LIMIT): # Maximum limit
                 action[0] = 0
                 print("Crossing limits d0 > 105")
-            if (self.d0 <= MIN_OBJ_LIMIT):
-                action[0] = 0 # limit it to 25 mm
+            if (self.d0 <= MIN_OBJ_LIMIT): # limit it to 25 mm
+                action[0] = 0 
                 print("Crossing limits d0 < 25")
-            if (self.t0 >= radians(140)): # Limit t0 at 140 deg
+            if (self.t0 >= radians(140)):  # limit t0 at 140 deg
                 action[0] = 0
                 print("Crossing limits t0 > 140")
 
@@ -139,15 +149,26 @@ class FFEnv(object):
         print('ff_info : ', self.ff_info)
         # For only sliding on left finger code we no need use ff_info['a']
         # state
-        s = self.ff_info['t'] # States should have theta, obj_pos, goal_pos
+        s = self.ff_info['t'] # States should have theta, obj_pos, goal_pos 
         # done and reward
         done = False
         r = 0. # Sparse reward Calculate distance between obj_pos and goal_pos
         return s, r, done
     
     def reset(self):
+        # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+        # During start of every episode the agent will reset the environment 
+        # 1. Assign a new goal location
+        # 2. Assign the initial state of the system 
+        #
+        # Input : none
+        # Output : state
+        # State : { theta_l, theta_r, d_l, d_r, O_x, O_y, (G-O)_x, (G-O)_y, done }
         self.ff_info['t'] = 2 * np.pi/2
-        return self.ff_info['t']
+        self.ff_info['d'][0] = 30 
+        
+        
+        return 
 
     def render(self):
         if self.viewer is None:
@@ -197,6 +218,7 @@ class Viewer(pyglet.window.Window):
     w0 = 25  # Object width
     wp = 50  # 
     fw = 18  # Finger width
+    obj_loc = []
 
     def __init__(self, ff_info, goal):
         # vsync=False to not use the monitor FPS, we can speed up training
@@ -205,8 +227,8 @@ class Viewer(pyglet.window.Window):
         self.ff_info = ff_info
         self.center_coord = np.array([100, 0]) 
 
-        self.obj_pos, self.obj_center = self.slide_Left_obj(self.ff_info['t'][1], self.ff_info['d'][1]) #+ self.center_coord
-        self.finger_l, self.finger_r = self.slide_Left_fingers(self.ff_info['t'][1], self.ff_info['d'][1]) #+ self.center_coord
+        self.obj_pos, self.obj_center = self.slide_Left_obj(self.ff_info['t'][1], self.ff_info['d'][1]) 
+        self.finger_l, self.finger_r = self.slide_Left_fingers(self.ff_info['t'][1], self.ff_info['d'][1]) 
 
         self.batch = pyglet.graphics.Batch()  # display whole batch at once
         
@@ -242,6 +264,7 @@ class Viewer(pyglet.window.Window):
                      self.obj_pos[3][0], self.obj_pos[3][1],
                      self.obj_pos[2][0], self.obj_pos[2][1]]),
                      ('c3B', (124, 252, 0) * 4,))
+        obj_loc = np.array([self.obj_center])
 
     def slide_Left_obj(self,tr, dr):
         # Define :  slide the object on left finger with friction enabled on right finger and disabled on left finger
@@ -260,7 +283,7 @@ class Viewer(pyglet.window.Window):
         # Plotting the Object
         pts = np.transpose([[pts_new[0, :]], [pts_new[1, :]]])
         pts = pts.reshape((4, 2))
-        obj_center = np.vstack([x_square, y_square])
+        obj_center = np.array([x_square, y_square])
         return pts*2.5, obj_center*2.5 # *2.5 for scaling up output
 
     def slide_Left_fingers(self,tr, dr):
@@ -309,7 +332,7 @@ class Viewer(pyglet.window.Window):
         # Plotting the Object
         pts = np.transpose([[pts_new[0, :]], [pts_new[1, :]]])
         pts = pts.reshape((4, 2))
-        obj_center = np.vstack([x_square, y_square])
+        obj_center = np.array([x_square, y_square])
     
         return pts*2.5, obj_center*2.5 # *2.5 for scaling up output
 
@@ -370,8 +393,8 @@ class Viewer(pyglet.window.Window):
         obj_pos_ += self.center_coord
         finger_l_ += self.center_coord
         finger_r_ += self.center_coord
-        obj_center[0][0] += self.center_coord[0]
-        obj_center[1][0] += self.center_coord[1]
+        print('obj_center : ', obj_center)
+        self.obj_loc = np.append(self.obj_loc, obj_center)
 
         self.object.vertices = np.hstack([obj_pos_[1][0] + self.center_coord[0], obj_pos_[1][1],         
                                       obj_pos_[0][0] + self.center_coord[0], obj_pos_[0][1],
@@ -384,7 +407,7 @@ class Viewer(pyglet.window.Window):
         self.finger_r.vertices = np.hstack([finger_r_[3][0] + self.center_coord[0], finger_r_[3][1],
                                                  finger_r_[2][0] + self.center_coord[0], finger_r_[2][1],
                                                  finger_r_[1][0] + self.center_coord[0], finger_r_[1][1],
-                                                 finger_r_[0][0] + self.center_coord[0], finger_r_[0][1]])
+                                                 finger_r_[0][0] + self.center_coord[0], finger_r_[0][1]])                                         
 
 if __name__ == '__main__':
     env = FFEnv()
@@ -392,8 +415,14 @@ if __name__ == '__main__':
     while True:
         print("Action Iteration : ", count)
         env.render()
-        env.step(env.sample_action())
-        count += 1        
-        #if (count >= 20):
+        break
+        #env.step(env.sample_action())
+        #count += 1        
+        #if (count >= 2):
+            #print("obj_center -> ", env.viewer.obj_loc)
+            #x, y = obj_loc
+            #plt.scatter(x, y)
+            #plt.show()
             #break
+            
         
