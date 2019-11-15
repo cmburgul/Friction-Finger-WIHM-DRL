@@ -29,15 +29,15 @@ class FFEnv(object):
     def __init__(self):
         self.ff_info = np.zeros(2, dtype=[('d', np.float32), ('t', np.float32), ('a', np.int)])
 
-        # Intialising with right finger
-        self.ff_info['t'][1] = radians(64)     # Initialising tr in deg
-        self.ff_info['d'][1] = 105               # Initialising dr in mm
-        self.ff_info['t'][0], self.ff_info['d'][0] = self.calc_left_config(self.ff_info['t'][1], self.ff_info['d'][1])
+        # Intialising with sliding on left finger 
+        #self.ff_info['t'][1] = radians(140)     # Initialising tr in deg
+        #self.ff_info['d'][1] =  25             # Initialising dr in mm
+        #self.ff_info['t'][0], self.ff_info['d'][0] = self.calc_left_config(self.ff_info['t'][1], self.ff_info['d'][1])
         
-        # Initialising with left finger
-        #self.ff_info['t'][0] = radians(140)      # Initialising tl in deg
-        #self.ff_info['d'][0] = 105                # Initialising dl in mm
-        #self.ff_info['t'][1], self.ff_info['d'][1] = self.calc_right_config(self.ff_info['t'][0], self.ff_info['d'][0])
+        # Initialising with sliding on right finger
+        self.ff_info['t'][0] = radians(140)      # Initialising tl in deg
+        self.ff_info['d'][0] = 25                # Initialising dl in mm
+        self.ff_info['t'][1], self.ff_info['d'][1] = self.calc_right_config(self.ff_info['t'][0], self.ff_info['d'][0])
 
         self.ff_info['a'] = 0
         print('Initial ff_info : ', self.ff_info)
@@ -166,7 +166,8 @@ class FFEnv(object):
         # State : { theta_l, theta_r, d_l, d_r, O_x, O_y, (G-O)_x, (G-O)_y, done }
         self.ff_info['t'] = 2 * np.pi/2
         self.ff_info['d'][0] = 30 
-        
+        # Goal location 
+
         
         return 
 
@@ -257,13 +258,13 @@ class Viewer(pyglet.window.Window):
                      self.finger_r[0][0], self.finger_r[0][1] ]),
                      ('c3B', (255, 215, 0) * 4,))
         # Goal Position of the object
-        self.obj_goal = self.batch.add(
-            4, pyglet.gl.GL_QUADS, None,
-            ('v2f', [self.obj_pos[1][0], self.obj_pos[1][1],     
-                     self.obj_pos[0][0], self.obj_pos[0][1],
-                     self.obj_pos[3][0], self.obj_pos[3][1],
-                     self.obj_pos[2][0], self.obj_pos[2][1]]),
-                     ('c3B', (124, 252, 0) * 4,))
+        #self.obj_goal = self.batch.add(
+        #    4, pyglet.gl.GL_QUADS, None,
+        #    ('v2f', [self.obj_pos[1][0], self.obj_pos[1][1],     
+        #             self.obj_pos[0][0], self.obj_pos[0][1],
+        #             self.obj_pos[3][0], self.obj_pos[3][1],
+        #             self.obj_pos[2][0], self.obj_pos[2][1]]),
+        #             ('c3B', (124, 252, 0) * 4,))
         obj_loc = np.array([self.obj_center])
 
     def slide_Left_obj(self,tr, dr):
@@ -325,7 +326,7 @@ class Viewer(pyglet.window.Window):
         y_square = (dl + self.w0 / 2.) * np.sin(tl) - (self.w0 / 2. + self.fw) * np.cos(tl) # y_sq (Center of the object)
         pts = np.array([[-self.w0 / 2., -self.w0 / 2., self.w0 / 2., self.w0 / 2.], [-self.w0 / 2., self.w0 / 2., self.w0 / 2., -self.w0 / 2.], [1, 1, 1, 1]])
         R = np.array([[np.cos(tl), -np.sin(tl), x_square], [np.sin(tl), np.cos(tl), y_square], [0, 0, 1]])
-        
+        print("dl : ", dl)
         # Points after transformation
         pts_new = np.dot(R, pts)
         
@@ -377,25 +378,23 @@ class Viewer(pyglet.window.Window):
         self.batch.draw()
  
     def _update_finger(self):
-        
         # Check action in ff_info['a'] and visualize based on it
         if (self.ff_info['a'][0] != 0 and self.ff_info['a'][1] == 0): # Action is sliding on left finger
             obj_pos_, obj_center = self.slide_Left_obj(self.ff_info['t'][1], self.ff_info['d'][1]) 
             finger_l_, finger_r_ = self.slide_Left_fingers(self.ff_info['t'][1], self.ff_info['d'][1])            
         elif (self.ff_info['a'][1] != 0 and self.ff_info['a'][0] == 0): # Action is sliding on right finger
-            obj_pos_, obj_center = self.slide_Right_obj(self.ff_info['t'][1], self.ff_info['d'][1]) 
-            finger_l_, finger_r_ = self.slide_Right_fingers(self.ff_info['t'][1], self.ff_info['d'][1]) 
+            obj_pos_, obj_center = self.slide_Right_obj(self.ff_info['t'][0], self.ff_info['d'][0]) 
+            finger_l_, finger_r_ = self.slide_Right_fingers(self.ff_info['t'][0], self.ff_info['d'][0]) 
         else:    
             print("ff_info['a'] : [0 0]")
-            obj_pos_, obj_center = self.slide_Right_obj(self.ff_info['t'][1], self.ff_info['d'][1]) 
-            finger_l_, finger_r_ = self.slide_Right_fingers(self.ff_info['t'][1], self.ff_info['d'][1])
+            obj_pos_, obj_center = self.slide_Right_obj(self.ff_info['t'][0], self.ff_info['d'][0]) 
+            finger_l_, finger_r_ = self.slide_Right_fingers(self.ff_info['t'][0], self.ff_info['d'][0])
 
         obj_pos_ += self.center_coord
         finger_l_ += self.center_coord
         finger_r_ += self.center_coord
         print('obj_center : ', obj_center)
         self.obj_loc = np.append(self.obj_loc, obj_center)
-
         self.object.vertices = np.hstack([obj_pos_[1][0] + self.center_coord[0], obj_pos_[1][1],         
                                       obj_pos_[0][0] + self.center_coord[0], obj_pos_[0][1],
                                       obj_pos_[3][0] + self.center_coord[0], obj_pos_[3][1],
@@ -415,8 +414,8 @@ if __name__ == '__main__':
     while True:
         print("Action Iteration : ", count)
         env.render()
-        break
-        #env.step(env.sample_action())
+        #break
+        env.step(env.sample_action())
         #count += 1        
         #if (count >= 2):
             #print("obj_center -> ", env.viewer.obj_loc)
