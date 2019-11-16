@@ -30,14 +30,14 @@ class FFEnv(object):
         self.ff_info = np.zeros(2, dtype=[('d', np.float32), ('t', np.float32), ('a', np.int)])
 
         # Intialising with sliding on left finger 
-        #self.ff_info['t'][1] = radians(140)     # Initialising tr in deg
-        #self.ff_info['d'][1] =  25             # Initialising dr in mm
-        #self.ff_info['t'][0], self.ff_info['d'][0] = self.calc_left_config(self.ff_info['t'][1], self.ff_info['d'][1])
+        self.ff_info['t'][1] = radians(50)     # Initialising tr in deg
+        self.ff_info['d'][1] =   20             # Initialising dr in mm
+        self.ff_info['t'][0], self.ff_info['d'][0] = self.calc_left_config(self.ff_info['t'][1], self.ff_info['d'][1])
         
         # Initialising with sliding on right finger
-        self.ff_info['t'][0] = radians(140)      # Initialising tl in deg
-        self.ff_info['d'][0] = 25                # Initialising dl in mm
-        self.ff_info['t'][1], self.ff_info['d'][1] = self.calc_right_config(self.ff_info['t'][0], self.ff_info['d'][0])
+        #self.ff_info['t'][0] = radians(90)      # Initialising tl in deg
+        #self.ff_info['d'][0] = 105                # Initialising dl in mm
+        #self.ff_info['t'][1], self.ff_info['d'][1] = self.calc_right_config(self.ff_info['t'][0], self.ff_info['d'][0])
 
         self.ff_info['a'] = 0
         print('Initial ff_info : ', self.ff_info)
