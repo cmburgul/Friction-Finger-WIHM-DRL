@@ -31,7 +31,7 @@ class FFEnv(object):
 
         # Intialising with sliding on left finger 
         self.ff_info['t'][1] = radians(50)     # Initialising tr in deg
-        self.ff_info['d'][1] =   20             # Initialising dr in mm
+        self.ff_info['d'][1] =  25             # Initialising dr in mm
         self.ff_info['t'][0], self.ff_info['d'][0] = self.calc_left_config(self.ff_info['t'][1], self.ff_info['d'][1])
         
         # Initialising with sliding on right finger
@@ -167,7 +167,7 @@ class FFEnv(object):
         self.ff_info['t'] = 2 * np.pi/2
         self.ff_info['d'][0] = 30 
         # Goal location 
-
+        goal_x, goal_y = self.get_goal_point()
         
         return 
 
@@ -214,6 +214,110 @@ class FFEnv(object):
             action[1] = action_i
         print('action :', action)
         return action
+  
+    # Addition al function
+    def slope(self,x1, y1, x2, y2):
+        m = float(float((y2 - y1))/float((x2 - x1)))
+        return m
+
+    # Additional function
+    def get_goal_point(self):  
+        goal_flag = True
+        while (goal_flag):
+            # Defining Points from A - D 
+            D_x, D_y = (-137.71, 215.09)
+            E_x, E_y = (45.107, 284.509)
+            F_x, F_y = (76.249, 281.25)
+            A_x, A_y = (243.11, 210.22)
+            B_x, B_y = (112.96, 129.67)
+            C_x, C_y = (-22.80, 118.67)
+
+            # Randomly selecting X, Y-Co-ordinates of goal within limits
+            x_g = np.random.randint(-137.71, 243.11, size=1).astype("float64")
+            y_g = np.random.randint(118.67, 284.80, size=1).astype("float64")
+
+            # Then sort it based on the section 
+            if (-137.70 < x_g < -22.80):
+                section = 1
+            elif (-22.80 <= x_g < 45.07):
+                section = 2
+            elif (45.07 <= x_g < 76.249):
+                section = 3
+            elif (76.249 <= x_g < 112.96):
+                section = 4
+            elif (112.96 <= x_g < 243.11):
+                section = 5
+
+            if (section == 1):
+                # slope of point G and point C
+                m_gc = self.slope(C_x, C_y, x_g, y_g)
+                # Slope of line CD
+                m_cd = self.slope(C_x, C_y, D_x, D_y)
+                # Slope of line DE
+                m_de = self.slope(D_x, D_y, E_x, E_y)
+                # Slope of point G and point D
+                m_gd = self.slope(D_x, D_y, x_g, y_g)
+                if (m_gd > m_cd and m_gd < m_de):
+                    #print("Yes It is inside the Section- I limits")
+                    goal_flag = False
+                    
+            elif (section == 2):
+                # Slope of line CB
+                m_cb = self.slope(C_x, C_y, B_x, B_y)
+                # Slope of line DE
+                m_de = self.slope(D_x, D_y, E_x, E_y)
+                # Slope of point G and point C
+                m_gc = self.slope(C_x, C_y, x_g, y_g)
+                # Slope of point G and point D
+                m_gd = self.slope(D_x, D_y, x_g, y_g)
+                if (m_gc > m_cb and m_gd < m_de):
+                    #print("Yes It is inside the Section- II limits")
+                    goal_flag = False
+                    
+            elif (section == 3):
+                # Slope of line CB
+                m_cb = self.slope(C_x, C_y, B_x, B_y)
+                # Slope of line FE
+                m_fe = self.slope(F_x, F_y, E_x, E_y)
+                # Slope of point G and point C
+                m_gc = self.slope(C_x, C_y, x_g, y_g)
+                # Slope of point G and point E
+                m_ge = self.slope(E_x, E_y, x_g, y_g)
+                if (m_gc > m_cb and m_ge < m_fe):
+                    #print("Yes It is inside the Section III limits")
+                    goal_flag = False
+                    
+            elif (section == 4):
+                # Slope of line CB
+                m_cb = self.slope(C_x, C_y, B_x, B_y)
+                # Slope of line FA
+                m_fa = self.slope(F_x, F_y, A_x, A_y)
+                # Slope of point G and point F
+                m_gf = self.slope(F_x, F_y, x_g, y_g)
+                # Slope of point G and point C
+                m_gc = self.slope(C_x, C_y, x_g, y_g)
+                if (m_gc > m_cb and m_gf < m_fa):
+                    #print("Yes It is inside the Section IV limits")
+                    goal_flag = False        
+                    
+            elif (section == 5):
+                # Slope of line AB
+                m_ab = self.slope(A_x, A_y, B_x, B_y)
+                # Slope of line FA
+                m_fa = self.slope(F_x, F_y, A_x, A_y)
+                # Slope of point G and point F
+                m_gf = self.slope(F_x, F_y, x_g, y_g)
+                # Slope of point G and point B
+                m_gb = self.slope(B_x, B_y, x_g, y_g)
+                if (m_gf < m_fa and m_gb > m_ab):
+                    #print("Yes It is inside the limits")
+                    goal_flag = False
+                    
+            #print("goal :", x_g, y_g )
+            if (goal_flag == False):
+                return x_g, y_g
+
+
 
 class Viewer(pyglet.window.Window):
     w0 = 25  # Object width
@@ -416,12 +520,13 @@ if __name__ == '__main__':
         env.render()
         #break
         env.step(env.sample_action())
-        #count += 1        
-        #if (count >= 2):
+        count += 1        
+        print("get goal point : ", env.get_goal_point())
+        if (count >= 5):
             #print("obj_center -> ", env.viewer.obj_loc)
             #x, y = obj_loc
             #plt.scatter(x, y)
             #plt.show()
-            #break
+            break
             
         
