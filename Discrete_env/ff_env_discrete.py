@@ -8,7 +8,8 @@ from math import radians, degrees
 MAX_OBJ_LIMIT = 105 # in mm
 MIN_OBJ_LIMIT = 25  # in mm
 obj_loc = np.array([]) # object position
-
+Δθ = 0.05 # Actuation magnitude
+ 
 # tl : theta_left
 # dl : distance from object base to left finger base
 # tr : theta_right
@@ -17,9 +18,9 @@ obj_loc = np.array([]) # object position
 class FFEnv(object):
     viewer = None
     dt = 0.01    # refresh rate
-    action_bound = [-1, 1]
+    #action_bound = [-1, 1]
     state_size = 7
-    action_size = 2
+    action_size = 5
     center_coord = np.array([100, 0])
 
     w0 = 25  # Object width
@@ -56,129 +57,259 @@ class FFEnv(object):
         # 4 : a = [0 -Δθ]   Moving Right Finger in CW  -- Sliding on Left Finger Up
         # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         
+        #print("action from agent : ", action)
         
+        #if (action == 0): # Action is not taking any action
+            # 0 : a = [0]
         
-        
-        
-        
-        print("action from agent : ", action)
-        if (action[0] != 0 and action[1] == 0): # Action is sliding on left finger
-            print("Action sliding Left")
-            self.ff_info['a'][0] = 1 
-            self.ff_info['a'][1] = 0
-            # Creating dummy variables t0, d0, t1, d1
-            self.t1 = self.ff_info['t'][1]
-            self.d1 = self.ff_info['d'][1]
+            #print("Action choosen is Do Nothing")
+
+        if (action == 1): # Action is Sliding on Right Finger Up  
+            # 1 : a = [+Δθ_l]   Moving Left Finger in CCW -- Sliding on Right Finger Up  
+            # Give θ_l and d_l values to get θ_r and d_r values
+            # Add the actuation of +Δθ in θ_l 
+
+            #print("Action choosen is Sliding on Right Finger Up")
             
-            self.t1 += action[0] * self.dt # Adding the action delta theta to theta_right or t_r
-
-            # Constraining the right finger 
-            if (self.t1 < radians(40)):   # limit it to greater than 40 deg
-                action[0] = 0 
-                print("Crossing limits t1 < 40")
-            if (self.d1 >= MAX_OBJ_LIMIT):   # limit it to 105 mm 
-                action[0] = 0 
-                print("Crossing limits d1 > 105")
-            if (self.d1 <= MIN_OBJ_LIMIT):    # limit it to 25 mm
-                action[0] = 0 
-                print("Crossing limits d1 < 25")
-
-            # Getting tl, dl by giving tr, dr
-            self.t0, self.d0 = self.calc_left_config(self.t1, self.d1) 
-
-            # Constraining tl, dl limits  
-            if (self.d0 >= MAX_OBJ_LIMIT): # Maximum limit
-                action[0] = 0
-                print("Crossing limits d0 > 105")
-            if (self.d0 <= MIN_OBJ_LIMIT): # limit it to 25 mm
-                action[0] = 0 
-                print("Crossing limits d0 < 25")
-            if (self.t0 >= radians(140)):  # limit t0 at 140 deg
-                action[0] = 0
-                print("Crossing limits t0 > 140")
-
-            if (action[0] == 0):
-                print("Crossing limits so action[0] = 0")    
-            
-            elif (action[0] != 0):
-                print("Action taken")
-                action[0] = np.clip(action[0], *self.action_bound) # Clipping the action
-                self.ff_info['t'][1] += action[0] * self.dt # Adding the action delta theta to theta_right or t_r
-                #self.ff_info['t'][1] %= np.pi * 2 # normalize ! Why ? Need to know
-                print('delta theta : [', action[0] * self.dt, ', ', action[1], ']')
-                # Getting tl, dl by giving tr, dr
-                self.ff_info['t'][0], self.ff_info['d'][0] = self.calc_left_config(self.ff_info['t'][1], self.ff_info['d'][1])   
-        
-        elif (action[1] != 0 and action[0] == 0): # Action is sliding on right finger
-            print("Action Sliding Right")
-            self.ff_info['a'][0] = 0 
-            self.ff_info['a'][1] = 1
             # Creating dummy variables t0, d0, t1, d1
+            # Copying values of ff_info['t'][0], ff_info['t'][1] to dummy variables t0, d0
             self.t0 = self.ff_info['t'][0]
             self.d0 = self.ff_info['d'][0]
 
-            action[1] = np.clip(action[1], * self.action_bound) # Clipping the action
-            self.t0 += action[1] * self.dt # Adding the action delta theta to theta_right or t_r
+            # Adding the action delta theta to theta_left or t_l and sliding on right finger
+            self.t0 += Δθ * self.dt 
+
+            # Actuation flag 
+            action_flag = True
 
             # Constraining the left finger to lesser than 140 deg
             if ( self.t0 >= radians(140) ):
-                action[1] = 0
-                print("Crossing limits t0 >= 140")
-            if (self.d0 >= MAX_OBJ_LIMIT ):
-                action[1] = 0
-                print("Crossing limits d0 >= 105")
-            if (self.d0 <= MIN_OBJ_LIMIT):
-                action[1] = 0
-                print("Crossing limits d0 <= 25")
+                action_flag = False
+                #print("Crossing limits t0 >= 140")
+            elif (self.d0 >= MAX_OBJ_LIMIT ):
+                action_flag = False
+                #print("Crossing limits d0 >= 105")
+            elif (self.d0 <= MIN_OBJ_LIMIT):
+                action_flag = False
+                #print("Crossing limits d0 <= 25")
 
             # Getting tr, dr by giving tl, d1
             self.t1, self.d1 = self.calc_right_config(self.t0, self.d0)
 
             # Constraining t1, d1 limits
             if ( self.d1 >= MAX_OBJ_LIMIT ):
-                action[1] = 0
-                print("Crossing limits d1 >= 105")
-            if (self.d1 <= MIN_OBJ_LIMIT):
-                action[1] = 0
-                print("Crossing limits d1 <= 25")
-            if ( self.t1 <= radians(40) or self.t1 >= radians(152) ): # greater than 140 deg
-                action[1] = 0
-                print("Crossing limits t1 <= 40")
+                action_flag = False
+                #print("Crossing limits d1 >= 105")
+            elif (self.d1 <= MIN_OBJ_LIMIT):
+                action_flag = False
+                #print("Crossing limits d1 <= 25")
+            elif ( self.t1 <= radians(40) or self.t1 >= radians(152) ): # greater than 140 deg
+                action_flag = False
+                #print("Crossing limits t1 <= 40")
 
-            if (action[1] == 0):
-                print(" So action[1] = 0") 
+            #elif (action_flag == False):
+                #print(" Action not taken") 
 
-            if (action[1] != 0):
-                print("Action taken")
-                # For sliding right take action for t0 and get tr, dr
-                self.ff_info['t'][0] += action[1] * self.dt  
+            if (action_flag == True):
+                #print("Action of Sliding on Right Finger Up is taken")
+                # For sliding right take action for tl, dl and get tr, dr
+                self.ff_info['t'][0] += Δθ * self.dt  
                 #self.ff_info['t'][1] %= np.pi * 2 # normalize ! Why ? Need to know         
-                print('delta theta : [', action[0], ', ', action[1]* self.dt, ']')
-                # Getting tl, dl by giving tr, dr
+                
+                # Getting tr, dr by giving tl, dl
                 self.ff_info['t'][1], self.ff_info['d'][1] = self.calc_right_config(self.ff_info['t'][0], self.ff_info['d'][0]) 
 
-        #print('ff_info : ', self.ff_info)
-        # For only sliding on left finger code we no need use ff_info['a']
+        elif (action == 2): # Action is Sliding on Right Finger Down
+            # 2 : a = [-Δθ_l]   Moving Left Finger in CW  -- Sliding on Right Finger Down
+            # Give θ_l and d_l values to get θ_r and d_r values
+            # Add the actuation of -Δθ in θ_l
+            
+            #print("Action choosen is Sliding on Right Finger Down")
+            
+            # Creating dummy variables t0, d0, t1, d1
+            # Copying values of ff_info['t'][0], ff_info['t'][1] to dummy variables t0, d0
+            self.t0 = self.ff_info['t'][0]
+            self.d0 = self.ff_info['d'][0]
+
+            # Adding the action delta theta to theta_left or t_l and sliding on right finger
+            self.t0 -= Δθ * self.dt 
+
+            # Actuation flag 
+            action_flag = True
+
+            # Constraining the left finger to lesser than 140 deg
+            if ( self.t0 >= radians(140) ):
+                action_flag = False
+                #print("Crossing limits t0 >= 140")
+            elif (self.d0 >= MAX_OBJ_LIMIT ):
+                action_flag = False
+                #print("Crossing limits d0 >= 105")
+            elif (self.d0 <= MIN_OBJ_LIMIT):
+                action_flag = False
+                #print("Crossing limits d0 <= 25")
+
+            # Getting tr, dr by giving tl, d1
+            self.t1, self.d1 = self.calc_right_config(self.t0, self.d0)
+
+            # Constraining t1, d1 limits
+            if ( self.d1 >= MAX_OBJ_LIMIT ):
+                action_flag = False
+                #print("Crossing limits d1 >= 105")
+            elif (self.d1 <= MIN_OBJ_LIMIT):
+                action_flag = False
+                #print("Crossing limits d1 <= 25")
+            elif ( self.t1 <= radians(40) or self.t1 >= radians(152) ): # greater than 140 deg
+                action_flag = False
+                #print("Crossing limits t1 <= 40")
+
+            #elif (action_flag == False):
+                #print(" Action not taken") 
+
+            if (action_flag == True):
+                #print("Action of Sliding on Right Finger Up is taken")
+                # For sliding right take action for tl, dl and get tr, dr
+                self.ff_info['t'][0] -= Δθ * self.dt  
+                
+                #self.ff_info['t'][1] %= np.pi * 2 # normalize ! Why ? Need to know         
+                
+                # Getting tr, dr by giving tl, dl
+                self.ff_info['t'][1], self.ff_info['d'][1] = self.calc_right_config(self.ff_info['t'][0], self.ff_info['d'][0]) 
+
+        elif (action == 3): # Action is Sliding on Left Finger Down
+            # 3 : a = [+Δθ_r]   Moving Right Finger in CCW -- Sliding on Left Finger Down
+            # Give θ_r and d_r values to get θ_l and d_l values
+            # Add the actuation of +Δθ in θ_r
+
+            #print("Action choosen is Sliding on Left Finger Down")
+            
+            # Creating dummy variables t0, d0, t1, d1
+            self.t1 = self.ff_info['t'][1]
+            self.d1 = self.ff_info['d'][1]
+          
+            self.t1 += Δθ * self.dt # Adding the action delta theta to theta_right or θ_r
+
+            # Actuation flag 
+            action_flag = True
+
+            # Constraining the right finger 
+            if (self.t1 < radians(40)):   # limit it to greater than 40 deg
+                action_flag = False
+                #print("Crossing limits t1 < 40")
+            if (self.d1 >= MAX_OBJ_LIMIT):   # limit it to 105 mm 
+                action_flag = False
+                #print("Crossing limits d1 > 105")
+            if (self.d1 <= MIN_OBJ_LIMIT):    # limit it to 25 mm
+                action_flag = False
+                #print("Crossing limits d1 < 25")
+
+            # Getting tl, dl by giving tr, dr
+            self.t0, self.d0 = self.calc_left_config(self.t1, self.d1) 
+
+            # Constraining tl, dl limits  
+            if (self.d0 >= MAX_OBJ_LIMIT): # Maximum limit
+                action_flag = False
+                #print("Crossing limits d0 > 105")
+            if (self.d0 <= MIN_OBJ_LIMIT): # limit it to 25 mm
+                action_flag = False
+                #print("Crossing limits d0 < 25")
+            if (self.t0 >= radians(140)):  # limit t0 at 140 deg
+                action_flag = False
+                #print("Crossing limits t0 > 140")
+
+            #if (action_flag == False):
+                #print(" Action not taken") 
+            
+            elif (action_flag == True):
+                #print("Action of Sliding on Left Finger Down is taken")
+                
+                self.ff_info['t'][1] += Δθ * self.dt   # Subtracting the action delta theta to theta_right or θ_r
+                
+                #self.ff_info['t'][1] %= np.pi * 2 # normalize ! Why ? Need to know
+                
+                # Getting tl, dl by giving tr, dr
+                self.ff_info['t'][0], self.ff_info['d'][0] = self.calc_left_config(self.ff_info['t'][1], self.ff_info['d'][1])   
+
+        elif (action == 4): # Action is Sliding on Left Finger Up
+            # 4 : a = [-Δθ_r]   Moving Right Finger in CW  -- Sliding on Left Finger Up
+            # Give θ_r and d_r values to get θ_l and d_l values
+            # Add the actuation of -Δθ in θ_r
+
+ 
+            #print("Action choosen is Sliding on Left Finger UP")
+            
+            # Creating dummy variables t0, d0, t1, d1
+            self.t1 = self.ff_info['t'][1]
+            self.d1 = self.ff_info['d'][1]
+          
+            self.t1 -= Δθ * self.dt # Adding the action delta theta to theta_right or θ_r
+
+            # Actuation flag 
+            action_flag = True
+
+            # Constraining the right finger 
+            if (self.t1 < radians(40)):   # limit it to greater than 40 deg
+                action_flag = False
+                #print("Crossing limits t1 < 40")
+            if (self.d1 >= MAX_OBJ_LIMIT):   # limit it to 105 mm 
+                action_flag = False
+                #print("Crossing limits d1 > 105")
+            if (self.d1 <= MIN_OBJ_LIMIT):    # limit it to 25 mm
+                action_flag = False
+                #print("Crossing limits d1 < 25")
+
+            # Getting tl, dl by giving tr, dr
+            self.t0, self.d0 = self.calc_left_config(self.t1, self.d1) 
+
+            # Constraining tl, dl limits  
+            if (self.d0 >= MAX_OBJ_LIMIT): # Maximum limit
+                action_flag = False
+                #print("Crossing limits d0 > 105")
+            if (self.d0 <= MIN_OBJ_LIMIT): # limit it to 25 mm
+                action_flag = False
+                #print("Crossing limits d0 < 25")
+            if (self.t0 >= radians(140)):  # limit t0 at 140 deg
+                action_flag = False
+                #print("Crossing limits t0 > 140")
+
+            #if (action_flag == False):
+                #print(" Action not taken") 
+            
+            elif (action_flag == True):
+                #print("Action of Sliding on Left Finger UP is taken")
+                
+                self.ff_info['t'][1] -= Δθ * self.dt   # Subtracting the action delta theta to theta_right or θ_r
+                
+                #self.ff_info['t'][1] %= np.pi * 2 # normalize ! Why ? Need to know
+                
+                # Getting tl, dl by giving tr, dr
+                self.ff_info['t'][0], self.ff_info['d'][0] = self.calc_left_config(self.ff_info['t'][1], self.ff_info['d'][1])         
+
+       #print('ff_info : ', self.ff_info)
+
         # State        
         # Object Position
-        # There is a difference in slide_obj_right and slide_obj_left. Let's follow a standard of slide_obj_right
+        # For getting Object Position there is a difference in slide_obj_right and slide_obj_left. 
+        # Let's follow a standard of getting Object Position from slide_obj_right
         self.obj_pos['x'], self.obj_pos['y'] = self.get_obj_slide_right(self.ff_info['t'][0], self.ff_info['d'][0])  
         
         # Distance from goal to object
-        dist_x = self.obj_pos['x'] - self.goal['x'] 
-        dist_y = self.obj_pos['y'] - self.goal['y']
+        dist_x = (self.obj_pos['x'] - self.goal['x'])
+        dist_y = (self.obj_pos['y'] - self.goal['y'])
         
         # done and reward
         #print("dist_x :", dist_x)
         #print("dist_y :", dist_y)
-        reward = -np.sqrt(dist_x**2 + dist_y**2)
-        #r = 0. # Sparse reward Calculate distance between obj_pos and goal_pos
+        # reward engineering
+        # reward = -np.sqrt((dist_x**2 + dist_y**2)/200)
+        
+        # Sparse reward
+        r = -1 # Sparse reward Calculate distance between obj_pos and goal_pos
         
         # Check if object is near to goal in x-axis
         if ( self.goal['x'] - self.goal['w']/2 < self.obj_pos['x'] < self.goal['x'] - self.goal['w']/2 ):
             # Check if object is near to goal in y-axis
-            if ( self.goal['x'] - self.goal['w']/2 < self.obj_pos['x'] < self.goal['x'] - self.goal['w']/2 ):
-                reward +=1.
+            if ( self.goal['y'] - self.goal['w']/2 < self.obj_pos['y'] < self.goal['y'] - self.goal['w']/2 ):
+                reward += 1.
                 self.on_goal += 1
                 if self.on_goal > 50:
                     done = True
@@ -186,11 +317,11 @@ class FFEnv(object):
             self.on_goal = 0
 
         # Concatenate and normalize
-        state = np.concatenate((self.ff_info['t'][0], self.ff_info['t'][1], self.obj_pos['x']/200, self.obj_pos['y']/200, dist_x/200, dist_y/200, [1. if self.on_goal else 0.]), axis=None)
-        #print("state -> step(action): ", state)
-        print('ff_info : ', self.ff_info)
+        next_state = np.concatenate((self.ff_info['t'][0], self.ff_info['t'][1], self.obj_pos['x']/200, self.obj_pos['y']/200, dist_x/200, dist_y/200, [1. if self.on_goal else 0.]), axis=None)
+        #print("state -> step(action): ", next_state)
+        #print('ff_info : ', self.ff_info)
         
-        return state, reward, done
+        return next_state, reward, done
     
     def reset(self):
         # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -200,7 +331,7 @@ class FFEnv(object):
         #
         # Input : none
         # Output : state
-        # State : { theta_l, theta_r, d_l, d_r, O_x, O_y, (G-O)_x, (G-O)_y, done }
+        # State : { theta_l, theta_r, O_x, O_y, (G-O)_x, (G-O)_y, done }
         self.ff_info['t'][0] = radians(90)
         self.ff_info['d'][0] = 100
         self.ff_info['t'][1], self.ff_info['d'][1] = self.calc_right_config(self.ff_info['t'][0], self.ff_info['d'][0])
@@ -209,8 +340,9 @@ class FFEnv(object):
         self.goal['x'], self.goal['y'] = self.get_goal_point()
         
         # Object Position
-        # There is a difference in slide_obj_right and slide_obj_left. Let's follow a standard of slide_obj_right
-        self.obj_pos['x'], self.obj_pos['y'] = self.get_obj_slide_right(self.ff_info['t'][0], self.ff_info['d'][0])        
+        # There is a difference in getting object position with slide_obj_right and slide_obj_left functions 
+        # Let's follow a standard of slide_obj_right
+        self.obj_pos['x' ], self.obj_pos['y'] = self.get_obj_slide_right(self.ff_info['t'][0], self.ff_info['d'][0])        
         #obj_pos_slide_left = self.get_obj_slide_left(self.ff_info['t'][1], self.ff_info['d'][1])
 
         #print("Obj Center while sliding right : ", self.obj_pos)
@@ -228,7 +360,7 @@ class FFEnv(object):
         if self.viewer is None:
             self.viewer = Viewer(self.ff_info, self.goal)
         self.viewer.render()
-        print('===============x================x====================x====================')
+        #print('===============x================x====================x====================')
 
     def calc_left_config(self, tr, dr):
         d2v = np.array([dr * np.cos(np.float64(tr)), dr * np.sin(np.float64(tr))])
@@ -256,17 +388,9 @@ class FFEnv(object):
         return tr, dr
 
     def sample_action(self):
-        list_ = [0, 1]                        # Create a list of [0, 1] [left, right]
-        list_i = random.choice(list_)         # Randomly select from list_
-        action_i = np.random.rand(1) - 0.5    # Take a random action
-        action = np.zeros(2)                  # Initialising actions with zeros  
-        print('Sampled an action')
-        if (list_i == 0):                       
-            action[0] = action_i
-        else:
-            action[1] = action_i
-        print('action :', action)
-        return action
+        # Discrete action space
+        list_ = [0, 1, 2, 3, 4]             # Create a list of [0, 1, 2, 3, 4] 
+        return random.choice(list_)        # Randomly select from list_        
   
     # Additional function
     def slope(self,x1, y1, x2, y2):

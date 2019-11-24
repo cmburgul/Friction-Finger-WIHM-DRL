@@ -169,7 +169,7 @@ class FFEnv(object):
         # Check if object is near to goal in x-axis
         if ( self.goal['x'] - self.goal['w']/2 < self.obj_pos['x'] < self.goal['x'] - self.goal['w']/2 ):
             # Check if object is near to goal in y-axis
-            if ( self.goal['x'] - self.goal['w']/2 < self.obj_pos['x'] < self.goal['x'] - self.goal['w']/2 ):
+            if ( self.goal['y'] - self.goal['w']/2 < self.obj_pos['y'] < self.goal['y'] - self.goal['w']/2 ):
                 reward +=1.
                 self.on_goal += 1
                 if self.on_goal > 50:
