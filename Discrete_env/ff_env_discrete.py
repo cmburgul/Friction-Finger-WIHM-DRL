@@ -299,11 +299,12 @@ class FFEnv(object):
         # done and reward
         #print("dist_x :", dist_x)
         #print("dist_y :", dist_y)
+        
         # reward engineering
         # reward = -np.sqrt((dist_x**2 + dist_y**2)/200)
         
         # Sparse reward
-        r = -1 # Sparse reward Calculate distance between obj_pos and goal_pos
+        reward = -1 # Sparse reward Calculate distance between obj_pos and goal_pos
         
         # Check if object is near to goal in x-axis
         if ( self.goal['x'] - self.goal['w']/2 < self.obj_pos['x'] < self.goal['x'] - self.goal['w']/2 ):
