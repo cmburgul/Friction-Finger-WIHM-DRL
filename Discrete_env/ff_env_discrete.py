@@ -292,6 +292,8 @@ class FFEnv(object):
         # Let's follow a standard of getting Object Position from slide_obj_right
         self.obj_pos['x'], self.obj_pos['y'] = self.get_obj_slide_right(self.ff_info['t'][0], self.ff_info['d'][0])  
         
+        #print("step function obj_pos : ", self.obj_pos )
+
         # Distance from goal to object
         dist_x = (self.obj_pos['x'] - self.goal['x'])
         dist_y = (self.obj_pos['y'] - self.goal['y'])
@@ -530,7 +532,9 @@ class Viewer(pyglet.window.Window):
         self.finger_l, self.finger_r = self.slide_Left_fingers(self.ff_info['t'][1], self.ff_info['d'][1]) 
 
         self.batch = pyglet.graphics.Batch()  # display whole batch at once
-        
+        self.goal = goal
+        self.obj_center_pos = {'x':0., 'y':0.} # Object Position
+
         # Object Position
         self.object = self.batch.add(
             4, pyglet.gl.GL_QUADS, None,    # 4 corners
@@ -627,7 +631,7 @@ class Viewer(pyglet.window.Window):
         y_square = (dl + self.w0 / 2.) * np.sin(tl) - (self.w0 / 2. + self.fw) * np.cos(tl) # y_sq (Center of the object)
         pts = np.array([[-self.w0 / 2., -self.w0 / 2., self.w0 / 2., self.w0 / 2.], [-self.w0 / 2., self.w0 / 2., self.w0 / 2., -self.w0 / 2.], [1, 1, 1, 1]])
         R = np.array([[np.cos(tl), -np.sin(tl), x_square], [np.sin(tl), np.cos(tl), y_square], [0, 0, 1]])
-        print("dl : ", dl)
+    
         # Points after transformation
         pts_new = np.dot(R, pts)
         
@@ -677,24 +681,28 @@ class Viewer(pyglet.window.Window):
     def on_draw(self):
         self.clear()
         self.batch.draw()
+
+    def get_obj_slide_right(self,tl, dl):
+        x_square = (dl + self.w0 / 2.) * np.cos(tl) + (self.w0 / 2. + self.fw) * np.sin(tl) # x_sq (Center of the object)
+        y_square = (dl + self.w0 / 2.) * np.sin(tl) - (self.w0 / 2. + self.fw) * np.cos(tl) # y_sq (Center of the object)
+        x_square = x_square*2.5 + self.center_coord[0]*2 
+        y_square = y_square*2.5
+        return x_square, y_square    # *2.5 for scaling up output
  
     def _update_finger(self):
         # Check action in ff_info['a'] and visualize based on it
-        if (self.ff_info['a'][0] != 0 and self.ff_info['a'][1] == 0): # Action is sliding on left finger
-            obj_pos_, obj_center = self.slide_Left_obj(self.ff_info['t'][1], self.ff_info['d'][1]) 
-            finger_l_, finger_r_ = self.slide_Left_fingers(self.ff_info['t'][1], self.ff_info['d'][1])            
-        elif (self.ff_info['a'][1] != 0 and self.ff_info['a'][0] == 0): # Action is sliding on right finger
-            obj_pos_, obj_center = self.slide_Right_obj(self.ff_info['t'][0], self.ff_info['d'][0]) 
-            finger_l_, finger_r_ = self.slide_Right_fingers(self.ff_info['t'][0], self.ff_info['d'][0]) 
-        else:    
-            obj_pos_, obj_center = self.slide_Right_obj(self.ff_info['t'][0], self.ff_info['d'][0]) 
-            finger_l_, finger_r_ = self.slide_Right_fingers(self.ff_info['t'][0], self.ff_info['d'][0])
+        obj_pos_, obj_center = self.slide_Right_obj(self.ff_info['t'][0], self.ff_info['d'][0]) 
+        finger_l_, finger_r_ = self.slide_Right_fingers(self.ff_info['t'][0], self.ff_info['d'][0])
+
+        self.obj_center_pos['x' ], self.obj_center_pos['y'] = self.get_obj_slide_right(self.ff_info['t'][0], self.ff_info['d'][0])        
+        print('obj_center : ', self.obj_center_pos['x'], self.obj_center_pos['y'], 'goal : ', self.goal)
+        #print('goal : ', self.goal)
+        #print("ff_info ", self.ff_info)
 
         obj_pos_ += self.center_coord
         finger_l_ += self.center_coord
         finger_r_ += self.center_coord
-        print('obj_center : ', obj_center)
-        self.obj_loc = np.append(self.obj_loc, obj_center)
+
         # Updating obj_pos in graphics
         self.object.vertices = np.hstack([obj_pos_[1][0] + self.center_coord[0], obj_pos_[1][1],         
                                       obj_pos_[0][0] + self.center_coord[0], obj_pos_[0][1],
