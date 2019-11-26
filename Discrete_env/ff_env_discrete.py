@@ -8,7 +8,7 @@ from math import radians, degrees
 MAX_OBJ_LIMIT = 105 # in mm
 MIN_OBJ_LIMIT = 25  # in mm
 obj_loc = np.array([]) # object position
-Δθ = 0.05 # Actuation magnitude
+Δθ = 0.5 # Actuation magnitude
  
 # tl : theta_left
 # dl : distance from object base to left finger base
@@ -301,10 +301,10 @@ class FFEnv(object):
         #print("dist_y :", dist_y)
         
         # reward engineering
-        # reward = -np.sqrt((dist_x**2 + dist_y**2)/200)
-        
+        reward = -np.sqrt((dist_x**2 + dist_y**2)/200)
+        #print(reward)
         # Sparse reward
-        reward = -1 # Sparse reward Calculate distance between obj_pos and goal_pos
+        #reward = -1 # Sparse reward Calculate distance between obj_pos and goal_pos
         
         # Check if object is near to goal in x-axis
         if ( self.goal['x'] - self.goal['w']/2 < self.obj_pos['x'] < self.goal['x'] - self.goal['w']/2 ):
@@ -338,7 +338,8 @@ class FFEnv(object):
         self.ff_info['t'][1], self.ff_info['d'][1] = self.calc_right_config(self.ff_info['t'][0], self.ff_info['d'][0])
         
         # Goal location 
-        self.goal['x'], self.goal['y'] = self.get_goal_point()
+        # self.goal['x'], self.goal['y'] = self.get_goal_point() # Multi-Goal RL
+        self.goal['x'], self.goal['y'] = 91, 215
         
         # Object Position
         # There is a difference in getting object position with slide_obj_right and slide_obj_left functions 
@@ -686,7 +687,6 @@ class Viewer(pyglet.window.Window):
             obj_pos_, obj_center = self.slide_Right_obj(self.ff_info['t'][0], self.ff_info['d'][0]) 
             finger_l_, finger_r_ = self.slide_Right_fingers(self.ff_info['t'][0], self.ff_info['d'][0]) 
         else:    
-            print("ff_info['a'] : [0 0]")
             obj_pos_, obj_center = self.slide_Right_obj(self.ff_info['t'][0], self.ff_info['d'][0]) 
             finger_l_, finger_r_ = self.slide_Right_fingers(self.ff_info['t'][0], self.ff_info['d'][0])
 
