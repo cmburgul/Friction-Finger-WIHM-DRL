@@ -7,8 +7,7 @@ from math import radians, degrees
 
 MAX_OBJ_LIMIT = 105 # in mm
 MIN_OBJ_LIMIT = 25  # in mm
-obj_loc = np.array([]) # object position
-Δθ = 0.5 # Actuation magnitude
+Δθ = 1 # Actuation magnitude
  
 # tl : theta_left
 # dl : distance from object base to left finger base
@@ -33,7 +32,7 @@ class FFEnv(object):
         self.goal['x'], self.goal['y'] = self.get_goal_point()
         # Intialising with sliding on left finger 
         self.ff_info['t'][1] = radians(90)     # Initialising tr in deg
-        self.ff_info['d'][1] =  35             # Initialising dr in mm
+        self.ff_info['d'][1] =  100             # Initialising dr in mm
         self.ff_info['t'][0], self.ff_info['d'][0] = self.calc_left_config(self.ff_info['t'][1], self.ff_info['d'][1])
         self.obj_pos = {'x':0., 'y':0.} # Object Position
         self.on_goal = 0
@@ -309,9 +308,9 @@ class FFEnv(object):
         #reward = -1 # Sparse reward Calculate distance between obj_pos and goal_pos
         
         # Check if object is near to goal in x-axis
-        if ( self.goal['x'] - self.goal['w']/2 < self.obj_pos['x'] < self.goal['x'] - self.goal['w']/2 ):
+        if ( self.goal['x'] - self.goal['w']/3 < self.obj_pos['x'] < self.goal['x'] - self.goal['w']/3 ):
             # Check if object is near to goal in y-axis
-            if ( self.goal['y'] - self.goal['w']/2 < self.obj_pos['y'] < self.goal['y'] - self.goal['w']/2 ):
+            if ( self.goal['y'] - self.goal['w']/3 < self.obj_pos['y'] < self.goal['y'] - self.goal['w']/3 ):
                 reward += 1.
                 self.on_goal += 1
                 if self.on_goal > 50:
@@ -328,7 +327,7 @@ class FFEnv(object):
     
     def reset(self):
         # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-        # During start of every episode the agent will reset the environment 
+        # During start of every episode the agent will reset the envirohnment 
         # 1. Gives a new goal location
         # 2. Gives a initial state of the system 
         #
@@ -341,7 +340,7 @@ class FFEnv(object):
         
         # Goal location 
         # self.goal['x'], self.goal['y'] = self.get_goal_point() # Multi-Goal RL
-        self.goal['x'], self.goal['y'] = 91, 215
+        self.goal['x'], self.goal['y'] = 100, 148
         
         # Object Position
         # There is a difference in getting object position with slide_obj_right and slide_obj_left functions 
@@ -355,6 +354,10 @@ class FFEnv(object):
         # Distance from goal to object
         dist_x = self.obj_pos['x'] - self.goal['x'] 
         dist_y = self.obj_pos['y'] - self.goal['y']
+
+        # Goal Positions
+        #self.goal['x']
+        #self.goal['y']
 
         state = np.concatenate((self.ff_info['t'][0], self.ff_info['t'][1], self.obj_pos['x']/200, self.obj_pos['y']/200, dist_x/200, dist_y/200, [1. if self.on_goal else 0.]), axis=None)
         #print("state : ", state)
@@ -519,7 +522,6 @@ class Viewer(pyglet.window.Window):
     w0 = 25  # Object width
     wp = 50  # 
     fw = 18  # Finger width
-    obj_loc = []
 
     def __init__(self, ff_info, goal):
         # vsync=False to not use the monitor FPS, we can speed up training
@@ -534,6 +536,8 @@ class Viewer(pyglet.window.Window):
         self.batch = pyglet.graphics.Batch()  # display whole batch at once
         self.goal = goal
         self.obj_center_pos = {'x':0., 'y':0.} # Object Position
+        self.obj_loc_x = np.array([]) # object position x
+        self.obj_loc_y = np.array([]) # object position y
 
         # Object Position
         self.object = self.batch.add(
@@ -569,7 +573,7 @@ class Viewer(pyglet.window.Window):
                      ('c3B', (124, 252, 0) * 4,))
         #print("obj_pos : ", self.obj_pos)
         #print("obj_goal : ", self.obj_goal)             
-        #print("goal pos : ", goal['x'], goal['y'])
+        print("goal pos : ", goal['x'], goal['y'])
         #obj_loc = np.array([self.obj_center])
 
     def slide_Left_obj(self,tr, dr):
@@ -695,6 +699,8 @@ class Viewer(pyglet.window.Window):
         finger_l_, finger_r_ = self.slide_Right_fingers(self.ff_info['t'][0], self.ff_info['d'][0])
 
         self.obj_center_pos['x' ], self.obj_center_pos['y'] = self.get_obj_slide_right(self.ff_info['t'][0], self.ff_info['d'][0])        
+        self.obj_loc_x = np.insert(self.obj_loc_x, 0, [self.obj_center_pos['x']])
+        self.obj_loc_y = np.insert(self.obj_loc_y, 0, [self.obj_center_pos['y']])
         print('obj_center : ', self.obj_center_pos['x'], self.obj_center_pos['y'], 'goal : ', self.goal)
         #print('goal : ', self.goal)
         #print("ff_info ", self.ff_info)
@@ -718,21 +724,24 @@ class Viewer(pyglet.window.Window):
                                                  finger_r_[2][0] + self.center_coord[0], finger_r_[2][1],
                                                  finger_r_[1][0] + self.center_coord[0], finger_r_[1][1],
                                                  finger_r_[0][0] + self.center_coord[0], finger_r_[0][1]])                                         
+    def return_path(self):
+        return self.obj_loc_x, self.obj_loc_y
+
 
 if __name__ == '__main__':
     env = FFEnv()
     count = 0
     while True:
-        print("Action Iteration : ", count)
+        #print("Action Iteration : ", count)
         env.render()
         #break
-        env.step(env.sample_action())
-        count += 1 
-        print('-------')   
+        #env.step(env.sample_action())
+        #count += 1 
+        #print('-------')   
         #env.reset()    
-        print('-------')
-        print("get goal point : ", env.get_goal_point())
-        if (count >= 1):
-            break
+        #print('-------')
+        #print("get goal point : ", env.get_goal_point())
+        #if (count >= 1):
+        #    break
             
         
