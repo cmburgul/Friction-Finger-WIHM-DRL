@@ -22,7 +22,7 @@ class FFEnv(object):
     action_size = 5
     center_coord = np.array([100, 0])
 
-    w0 = 25  # Object width
+    w0 = 25  # Object width cube
     wp = 50  # 
     fw = 18  # Finger width
 
@@ -30,13 +30,12 @@ class FFEnv(object):
         self.ff_info = np.zeros(2, dtype=[('d', np.float32), ('t', np.float32), ('a', np.int)])
         self.goal = {'x': 0., 'y': 0., 'w':self.w0} # Goal Position of the Object 
         self.goal['x'], self.goal['y'] = self.get_goal_point()
-        #self.goal['x'], self.goal['y'] = 245, 284
         
         # Intialising with sliding on left finger 
-        self.ff_info['t'][1] = radians(90)      # Initialising tr in deg
-        self.ff_info['d'][1] =  100             # Initialising dr in mm
+        self.ff_info['t'][1] = radians(90)     # Initialising tr in deg
+        self.ff_info['d'][1] =  100            # Initialising dr in mm
         self.ff_info['t'][0], self.ff_info['d'][0] = self.calc_left_config(self.ff_info['t'][1], self.ff_info['d'][1])
-        self.obj_pos = {'x':0., 'y':0.} # Object Position
+        self.obj_pos = {'x':0., 'y':0.}        # Object Position
         self.on_goal = 0
         
         # Initialising with sliding on right finger
@@ -45,7 +44,7 @@ class FFEnv(object):
         #self.ff_info['t'][1], self.ff_info['d'][1] = self.calc_right_config(self.ff_info['t'][0], self.ff_info['d'][0])
 
         self.ff_info['a'] = 0
-        print('Initial ff_info : ', self.ff_info)
+        #print('Initial ff_info : ', self.ff_info)
         
     def step(self, action):
         done = False
@@ -60,6 +59,7 @@ class FFEnv(object):
         
         #print("action from agent : ", action)
         
+        # Need to add this action as when it reaches the goal it should start taking this action to set done = True
         #if (action == 0): # Action is not taking any action
             # 0 : a = [0]
         
@@ -285,7 +285,7 @@ class FFEnv(object):
                 # Getting tl, dl by giving tr, dr
                 self.ff_info['t'][0], self.ff_info['d'][0] = self.calc_left_config(self.ff_info['t'][1], self.ff_info['d'][1])         
 
-       #print('ff_info : ', self.ff_info)
+        #print('ff_info : ', self.ff_info)
 
         # State        
         # Object Position
@@ -303,9 +303,11 @@ class FFEnv(object):
         #print("dist_x :", dist_x)
         #print("dist_y :", dist_y)
         
-        # reward engineering
-        reward = -np.sqrt((dist_x**2 + dist_y**2))/200
+        # Calculating reward
+        # Reward engineering
+        reward = -np.sqrt((dist_x**2 + dist_y**2)/200)
         #print(reward)
+
         # Sparse reward
         #reward = -1 # Sparse reward Calculate distance between obj_pos and goal_pos
         
@@ -321,7 +323,14 @@ class FFEnv(object):
             self.on_goal = 0
 
         # Concatenate and normalize
-        next_state = np.concatenate((self.ff_info['t'][0], self.ff_info['t'][1], self.obj_pos['x']/200, self.obj_pos['y']/200, dist_x/200, dist_y/200, [1. if self.on_goal else 0.]), axis=None)
+        next_state = np.concatenate((self.ff_info['t'][0], 
+                                     self.ff_info['t'][1], 
+                                     self.obj_pos['x']/200, 
+                                     self.obj_pos['y']/200, 
+                                     self.goal['x']/200, 
+                                     self.goal['y']/200, 
+                                     [1. if self.on_goal else 0.]),
+                                      axis=None)
         #print("state -> step(action): ", next_state)
         #print('ff_info : ', self.ff_info)
         
@@ -342,7 +351,7 @@ class FFEnv(object):
         
         # Goal location 
         # self.goal['x'], self.goal['y'] = self.get_goal_point() # Multi-Goal RL
-        self.goal['x'], self.goal['y'] = 245, 284
+        self.goal['x'], self.goal['y'] = 100, 148 # Setting a goal
         
         # Object Position
         # There is a difference in getting object position with slide_obj_right and slide_obj_left functions 
@@ -354,14 +363,21 @@ class FFEnv(object):
         #print("Obj Center while sliding left : ", obj_pos_slide_left)
 
         # Distance from goal to object
-        dist_x = self.obj_pos['x'] - self.goal['x'] 
-        dist_y = self.obj_pos['y'] - self.goal['y']
+        #dist_x = self.obj_pos['x'] - self.goal['x'] 
+        #dist_y = self.obj_pos['y'] - self.goal['y']
 
         # Goal Positions
         #self.goal['x']
         #self.goal['y']
 
-        state = np.concatenate((self.ff_info['t'][0], self.ff_info['t'][1], self.obj_pos['x']/200, self.obj_pos['y']/200, dist_x/200, dist_y/200, [1. if self.on_goal else 0.]), axis=None)
+        state = np.concatenate((self.ff_info['t'][0],    # Left Finger Angle
+                                self.ff_info['t'][1],    # Right Finger Angle
+                                self.obj_pos['x']/200,   # Object Position x
+                                self.obj_pos['y']/200,   # Object Position y 
+                                self.goal['x']/200,      # Goal Position x
+                                self.goal['y']/200,      # Goal Position y
+                                [1. if self.on_goal else 0.]),
+                                 axis=None)
         #print("state : ", state)
         return state
 
@@ -370,6 +386,11 @@ class FFEnv(object):
             self.viewer = Viewer(self.ff_info, self.goal)
         self.viewer.render()
         #print('===============x================x====================x====================')
+
+    def get_reward(self, next_state):
+        # Minus of Distance from goal to object
+        r = -np.sqrt( (next_state[2] - next_state[4])**2 + (next_state[3] - next_state[5])**2  )
+        return r
 
     def calc_left_config(self, tr, dr):
         d2v = np.array([dr * np.cos(np.float64(tr)), dr * np.sin(np.float64(tr))])
@@ -537,8 +558,6 @@ class Viewer(pyglet.window.Window):
 
         self.batch = pyglet.graphics.Batch()  # display whole batch at once
         self.goal = goal
-        #self.goal['x'] += 2*self.center_coord[0]
-        
         self.obj_center_pos = {'x':0., 'y':0.} # Object Position
         self.obj_loc_x = np.array([]) # object position x
         self.obj_loc_y = np.array([]) # object position y
@@ -739,7 +758,7 @@ if __name__ == '__main__':
         #print("Action Iteration : ", count)
         env.render()
         #break
-        #env.step(env.sample_action())
+        env.step(env.sample_action())
         #count += 1 
         #print('-------')   
         #env.reset()    
