@@ -29,8 +29,8 @@ class FFEnv(object):
     def __init__(self):
         self.ff_info = np.zeros(2, dtype=[('d', np.float32), ('t', np.float32), ('a', np.int)])
         self.goal = {'x': 0., 'y': 0., 'w':self.w0} # Goal Position of the Object 
-        self.goal['x'], self.goal['y'] = self.get_goal_point()
-        #self.goal['x'], self.goal['y'] = 245, 284
+        #self.goal['x'], self.goal['y'] = self.get_goal_point()
+        self.goal['x'], self.goal['y'] = 388, 228
         
         # Intialising with sliding on left finger 
         #self.ff_info['t'][1] = radians(50)      # Initialising tr in deg
@@ -39,7 +39,7 @@ class FFEnv(object):
         
         # Initialising with sliding on right finger
         self.ff_info['t'][0] = radians(90)        # Initialising tl in deg
-        self.ff_info['d'][0] = 80                # Initialising dl in mm
+        self.ff_info['d'][0] = 35                # Initialising dl in mm
         self.ff_info['t'][1], self.ff_info['d'][1] = self.calc_right_config(self.ff_info['t'][0], self.ff_info['d'][0])
 
         self.obj_pos = {'x':0., 'y':0.} # Object Position
@@ -61,10 +61,9 @@ class FFEnv(object):
         
         #print("action from agent : ", action)
         
-        #if (action == 0): # Action is not taking any action
-            # 0 : a = [0]
-        
-            #print("Action choosen is Do Nothing")
+        #print("Action choosen is Do Nothing")
+        if (action == 0):
+            self.ff_info['t'][0] = self.ff_info['t'][0] # Hovering Object at a place (or) taking a pause 
 
         if (action == 1): # Action is Sliding on Right Finger Up  
             # 1 : a = [+Δθ_l]   Moving Left Finger in CCW -- Sliding on Right Finger Up  
@@ -286,7 +285,7 @@ class FFEnv(object):
                 # Getting tl, dl by giving tr, dr
                 self.ff_info['t'][0], self.ff_info['d'][0] = self.calc_left_config(self.ff_info['t'][1], self.ff_info['d'][1])         
 
-       #print('ff_info : ', self.ff_info)
+        #print('ff_info : ', self.ff_info)
 
         # State        
         # Object Position
@@ -322,7 +321,14 @@ class FFEnv(object):
             self.on_goal = 0
 
         # Concatenate and normalize
-        next_state = np.concatenate((self.ff_info['t'][0], self.ff_info['t'][1], self.obj_pos['x']/200, self.obj_pos['y']/200, dist_x/200, dist_y/200, [1. if self.on_goal else 0.]), axis=None)
+        next_state = np.concatenate((self.ff_info['t'][0], 
+                                     self.ff_info['t'][1], 
+                                     self.obj_pos['x']/200, 
+                                     self.obj_pos['y']/200, 
+                                     dist_x/200, 
+                                     dist_y/200, 
+                                     [1. if self.on_goal else 0.]), axis=None)
+        #next_state = np.concatenate((self.ff_info['t'][0], self.ff_info['t'][1], self.obj_pos['x']/200, self.obj_pos['y']/200, self.goal['x']/200, self.goal['y']/200, [1. if self.on_goal else 0.]), axis=None)
         #print("state -> step(action): ", next_state)
         #print('ff_info : ', self.ff_info)
         
@@ -338,12 +344,12 @@ class FFEnv(object):
         # Output : state
         # State : { theta_l, theta_r, O_x, O_y, (G-O)_x, (G-O)_y, done }
         self.ff_info['t'][0] = radians(90)
-        self.ff_info['d'][0] = 100
+        self.ff_info['d'][0] = 35
         self.ff_info['t'][1], self.ff_info['d'][1] = self.calc_right_config(self.ff_info['t'][0], self.ff_info['d'][0])
         
         # Goal location 
         # self.goal['x'], self.goal['y'] = self.get_goal_point() # Multi-Goal RL
-        self.goal['x'], self.goal['y'] = 245, 284
+        self.goal['x'], self.goal['y'] = 388, 228
         
         # Object Position
         # There is a difference in getting object position with slide_obj_right and slide_obj_left functions 
@@ -363,6 +369,7 @@ class FFEnv(object):
         #self.goal['y']
 
         state = np.concatenate((self.ff_info['t'][0], self.ff_info['t'][1], self.obj_pos['x']/200, self.obj_pos['y']/200, dist_x/200, dist_y/200, [1. if self.on_goal else 0.]), axis=None)
+        #state = np.concatenate((self.ff_info['t'][0], self.ff_info['t'][1], self.obj_pos['x']/200, self.obj_pos['y']/200, self.goal['x']/200, self.goal['y']/200, [1. if self.on_goal else 0.]), axis=None)
         #print("state : ", state)
         return state
 
