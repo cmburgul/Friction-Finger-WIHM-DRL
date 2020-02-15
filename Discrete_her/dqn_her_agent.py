@@ -194,7 +194,7 @@ class HER:
         for i in range(len(new_buffer)):
             new_buffer[i].state[4:6] = goal
             new_buffer[i].next_state[4:6] = goal
-            new_buffer[i].reward = np.sqrt((new_buffer[i].next_state[2] - new_buffer[i].next_state[4])**2 + (new_buffer[i].next_state[3] - new_buffer[i].next_state[5])**2) 
+            new_buffer[i].reward = -1*np.sqrt((new_buffer[i].next_state[2] - new_buffer[i].next_state[4])**2 + (new_buffer[i].next_state[3] - new_buffer[i].next_state[5])**2) 
             new_buffer[i].done = False
             if (new_buffer[i].reward == 0):
                 new_buffer[i].done = True

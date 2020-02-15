@@ -4,9 +4,13 @@ import random
 import time
 import matplotlib.pyplot as plt
 from math import radians, degrees
+from shapely.geometry import Polygon, Point
 
-MAX_OBJ_LIMIT = 105 # in mm
-MIN_OBJ_LIMIT = 25  # in mm
+MAX_OBJ_LIMIT = 80  # 105 # in mm
+MIN_OBJ_LIMIT = 50  # 25  # in mm
+LEFT_MAX = 140 # 140 # in deg
+RIGHT_MIN = 40 # 40
+RIGHT_MAX = 60 # 152
 Δθ = 1 # Actuation magnitude
  
 # tl : theta_left
@@ -28,11 +32,12 @@ class FFEnv(object):
     def __init__(self):
         self.ff_info = np.zeros(2, dtype=[('d', np.float32), ('t', np.float32), ('a', np.int)])
         self.goal = {'x': 0., 'y': 0., 'w':self.w0} # Goal Position of the Object 
-        self.goal['x'], self.goal['y'] = self.get_goal_point()
-        
+        #self.goal['x'], self.goal['y'] = self.get_goal_point()
+        self.goal['x'], self.goal['y'] = self.get_sub_goal()
+
         # Intialising with sliding on left finger 
-        self.ff_info['t'][1] = radians(90)     # Initialising tr in deg
-        self.ff_info['d'][1] =  30           # Initialising dr in mm
+        self.ff_info['t'][1] = radians(60)     # Initialising tr in deg
+        self.ff_info['d'][1] =  55          # Initialising dr in mm
         self.ff_info['t'][0], self.ff_info['d'][0] = self.calc_left_config(self.ff_info['t'][1], self.ff_info['d'][1])
         self.obj_pos = {'x':0., 'y':0.}        # Object Position
         self.on_goal = 0
@@ -79,8 +84,8 @@ class FFEnv(object):
             # Actuation flag 
             action_flag = True
 
-            # Constraining the left finger to lesser than 140 deg
-            if ( self.t0 >= radians(140) ):
+            # Constraining the left finger to lesser than 140 deg (LEFT_MAX)
+            if ( self.t0 >= radians(LEFT_MAX) ):
                 action_flag = False
                 #print("Crossing limits t0 >= 140")
             elif (self.d0 >= MAX_OBJ_LIMIT ):
@@ -100,7 +105,7 @@ class FFEnv(object):
             elif (self.d1 <= MIN_OBJ_LIMIT):
                 action_flag = False
                 #print("Crossing limits d1 <= 25")
-            elif ( self.t1 <= radians(40) or self.t1 >= radians(152) ): # greater than 140 deg
+            elif ( self.t1 <= radians(RIGHT_MIN) or self.t1 >= radians(RIGHT_MAX) ): # greater than 140 deg
                 action_flag = False
                 #print("Crossing limits t1 <= 40")
 
@@ -135,7 +140,7 @@ class FFEnv(object):
             action_flag = True
 
             # Constraining the left finger to lesser than 140 deg
-            if ( self.t0 >= radians(140) ):
+            if ( self.t0 >= radians(LEFT_MAX) ):
                 action_flag = False
                 #print("Crossing limits t0 >= 140")
             elif (self.d0 >= MAX_OBJ_LIMIT ):
@@ -155,7 +160,7 @@ class FFEnv(object):
             elif (self.d1 <= MIN_OBJ_LIMIT):
                 action_flag = False
                 #print("Crossing limits d1 <= 25")
-            elif ( self.t1 <= radians(40) or self.t1 >= radians(152) ): # greater than 140 deg
+            elif ( self.t1 <= radians(40) or self.t1 >= radians(RIGHT_MAX) ): # greater than 140 deg
                 action_flag = False
                 #print("Crossing limits t1 <= 40")
 
@@ -189,7 +194,7 @@ class FFEnv(object):
             action_flag = True
 
             # Constraining the right finger 
-            if (self.t1 < radians(40)):   # limit it to greater than 40 deg
+            if (self.t1 < radians(RIGHT_MIN)):   # limit it to greater than 40 deg
                 action_flag = False
                 #print("Crossing limits t1 < 40")
             if (self.d1 >= MAX_OBJ_LIMIT):   # limit it to 105 mm 
@@ -209,7 +214,7 @@ class FFEnv(object):
             if (self.d0 <= MIN_OBJ_LIMIT): # limit it to 25 mm
                 action_flag = False
                 #print("Crossing limits d0 < 25")
-            if (self.t0 >= radians(140)):  # limit t0 at 140 deg
+            if (self.t0 >= radians(LEFT_MAX)):  # limit t0 at 140 deg
                 action_flag = False
                 #print("Crossing limits t0 > 140")
 
@@ -244,7 +249,7 @@ class FFEnv(object):
             action_flag = True
 
             # Constraining the right finger 
-            if (self.t1 < radians(40)):   # limit it to greater than 40 deg
+            if (self.t1 < radians(RIGHT_MIN)):   # limit it to greater than RIGHT_MIN (40)
                 action_flag = False
                 #print("Crossing limits t1 < 40")
             if (self.d1 >= MAX_OBJ_LIMIT):   # limit it to 105 mm 
@@ -264,7 +269,7 @@ class FFEnv(object):
             if (self.d0 <= MIN_OBJ_LIMIT): # limit it to 25 mm
                 action_flag = False
                 #print("Crossing limits d0 < 25")
-            if (self.t0 >= radians(140)):  # limit t0 at 140 deg
+            if (self.t0 >= radians(LEFT_MAX)):  # limit t0 at 140 deg
                 action_flag = False
                 #print("Crossing limits t0 > 140")
 
@@ -313,7 +318,7 @@ class FFEnv(object):
             if ( self.goal['y'] - self.goal['w']/2 < self.obj_pos['y'] < self.goal['y'] + self.goal['w']/2 ):
                 reward += 1.
                 self.on_goal += 1
-                if self.on_goal > 1:
+                if self.on_goal > 5:
                     done = True
         else:
             self.on_goal = 0
@@ -342,29 +347,18 @@ class FFEnv(object):
         # Output : state
         # State : { theta_l, theta_r, O_x, O_y, (G-O)_x, (G-O)_y, done }
         self.ff_info['t'][0] = radians(90)
-        self.ff_info['d'][0] = 30
+        self.ff_info['d'][0] = 55
         self.ff_info['t'][1], self.ff_info['d'][1] = self.calc_right_config(self.ff_info['t'][0], self.ff_info['d'][0])
         
         # Goal location 
-        self.goal['x'], self.goal['y'] = self.get_goal_point() # Multi-Goal RL
-        #self.goal['x'], self.goal['y'] = 100, 148 # Setting a goal
+        #self.goal['x'], self.goal['y'] = self.get_goal_point() # Multi-Goal RL
+        self.goal['x'], self.goal['y'] = self.get_sub_goal() # Setting a goal
         
         # Object Position
         # There is a difference in getting object position with slide_obj_right() and slide_obj_left() functions 
         # Let's follow a standard of slide_obj_right()
         self.obj_pos['x' ], self.obj_pos['y'] = self.get_obj_slide_right(self.ff_info['t'][0], self.ff_info['d'][0])        
         #self.obj_pos['x' ], self.obj_pos['y'] = self.get_obj_slide_left(self.ff_info['t'][1], self.ff_info['d'][1])
-
-        #print("Obj Center while sliding right : ", self.obj_pos)
-        #print("Obj Center while sliding left : ", obj_pos_slide_left)
-
-        # Distance from goal to object
-        #dist_x = self.obj_pos['x'] - self.goal['x'] 
-        #dist_y = self.obj_pos['y'] - self.goal['y']
-
-        # Goal Positions
-        #self.goal['x']
-        #self.goal['y']
 
         # Concatenate and normalize
         state = np.concatenate((self.ff_info['t'][0],                           # Left Finger Angle
@@ -375,18 +369,16 @@ class FFEnv(object):
                                 self.goal['y']/200,                             # Goal_y
                                 [1. if self.on_goal else 0.]),                  # on_goal
                                 axis=None)
-        #print("state : ", state)
         return state
 
     def render(self):
         if self.viewer is None:
             self.viewer = Viewer(self.ff_info, self.goal)
         self.viewer.render()
-        #print('===============x================x====================x====================')
 
     def get_reward(self, next_state):
         # Negative of Distance from goal to object
-        r = -np.sqrt( (next_state[2] - next_state[4])**2 + (next_state[3] - next_state[5])**2  )
+        r = -1*np.sqrt( (next_state[2] - next_state[4])**2 + (next_state[3] - next_state[5])**2  )
         return r
 
     def calc_left_config(self, tr, dr):
@@ -416,8 +408,8 @@ class FFEnv(object):
 
     def sample_action(self):
         # Discrete action space
-        list_ = [0, 1, 2, 3, 4]             # Create a list of [0, 1, 2, 3, 4] 
-        return random.choice(list_)        # Randomly select from list_        
+        action_list = [0, 1, 2, 3, 4]             # Create a list of [0, 1, 2, 3, 4] 
+        return random.choice(action_list)        # Randomly select from list_        
   
     # Additional function
     def slope(self,x1, y1, x2, y2):
@@ -490,6 +482,16 @@ class FFEnv(object):
                 #print("section :", section)
                 return x_g[0], y_g[0]
     
+    def get_sub_goal(self):
+        goal_flag = True
+        poly = Polygon([(452.76, 217.79), (394.59, 173.15), (333.183, 183.19),(372.05, 245.42)])
+        min_x, min_y, max_x, max_y = poly.bounds
+        while (goal_flag):
+            random_point = Point([random.uniform(min_x, max_x), random.uniform(min_y, max_y)])
+            if (random_point.within(poly)):
+                    return (random_point.x, random_point.y)
+
+
     # Additional function
     def get_obj_slide_right(self,tl, dl):
         x_square = (dl + self.w0 / 2.) * np.cos(tl) + (self.w0 / 2. + self.fw) * np.sin(tl) # x_sq (Center of the object)
@@ -556,14 +558,14 @@ class Viewer(pyglet.window.Window):
         # Goal Position of the object
         self.goal_pos = self.batch.add(
             4, pyglet.gl.GL_QUADS, None,
-            ('v2f', [goal['x']+20, goal['y']+20,
-                     goal['x']+20, goal['y']-20,
-                     goal['x']-20, goal['y']-20,
-                     goal['x']-20, goal['y']+20 ]),
+            ('v2f', [self.goal['x']+20, self.goal['y']+20,
+                     self.goal['x']+20, self.goal['y']-20,
+                     self.goal['x']-20, self.goal['y']-20,
+                     self.goal['x']-20, self.goal['y']+20 ]),
                      ('c3B', (124, 252, 0) * 4,))
         #print("obj_pos : ", self.obj_pos)
         #print("obj_goal : ", self.obj_goal)             
-        print("goal pos : ", goal['x'], goal['y'])
+        print("goal pos : ", self.goal['x'], self.goal['y'])
         #obj_loc = np.array([self.obj_center])
 
     def slide_Left_obj(self,tr, dr):
@@ -691,9 +693,7 @@ class Viewer(pyglet.window.Window):
         self.obj_center_pos['x' ], self.obj_center_pos['y'] = self.get_obj_slide_right(self.ff_info['t'][0], self.ff_info['d'][0])        
         self.obj_loc_x = np.insert(self.obj_loc_x, 0, [self.obj_center_pos['x']])
         self.obj_loc_y = np.insert(self.obj_loc_y, 0, [self.obj_center_pos['y']])
-        print('obj_center : ', self.obj_center_pos['x'], self.obj_center_pos['y'], 'goal : ', self.goal)
-        #print('goal : ', self.goal)
-        #print("ff_info ", self.ff_info)
+        print('obj :', self.obj_center_pos['x'], self.obj_center_pos['y'], "goal :", self.goal['x'], self.goal['y'])
 
         obj_pos_ += self.center_coord
         finger_l_ += self.center_coord
@@ -713,7 +713,12 @@ class Viewer(pyglet.window.Window):
         self.finger_r.vertices = np.hstack([finger_r_[3][0] + self.center_coord[0], finger_r_[3][1],
                                                  finger_r_[2][0] + self.center_coord[0], finger_r_[2][1],
                                                  finger_r_[1][0] + self.center_coord[0], finger_r_[1][1],
-                                                 finger_r_[0][0] + self.center_coord[0], finger_r_[0][1]])                                         
+                                                 finger_r_[0][0] + self.center_coord[0], finger_r_[0][1]])   
+
+        self.goal_pos.vertices = np.hstack([self.goal['x']+20, self.goal['y']+20,
+                     self.goal['x']+20, self.goal['y']-20,
+                     self.goal['x']-20, self.goal['y']-20,
+                     self.goal['x']-20, self.goal['y']+20 ])                                      
     
     def return_path(self):
         return self.obj_loc_x, self.obj_loc_y
