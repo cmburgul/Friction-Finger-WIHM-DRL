@@ -1,0 +1,17 @@
+
+model : ppo2.zip
+
+Multistart Multigoal
+
+Network Architecture : [256, 256] 
+
+Number of time_steps per episode : 256 
+
+Goal : Reward Engineered (negative before reach and zero after reach) 
+
+Multi start  :  self.ff_info['t'][0] = radians(np.random.randint(60, 120))
+                self.ff_info['d'][0] = np.random.randint(35, 85)
+
+Multi Goal   :  All goal
+
+ 

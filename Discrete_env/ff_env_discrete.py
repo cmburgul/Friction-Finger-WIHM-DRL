@@ -38,8 +38,8 @@ class FFEnv(object):
         #self.ff_info['t'][0], self.ff_info['d'][0] = self.calc_left_config(self.ff_info['t'][1], self.ff_info['d'][1])
         
         # Initialising with sliding on right finger
-        self.ff_info['t'][0] = radians(90)        # Initialising tl in deg
-        self.ff_info['d'][0] = 35                # Initialising dl in mm
+        self.ff_info['t'][0] = radians(60)        # Initialising tl in deg
+        self.ff_info['d'][0] = 85                # Initialising dl in mm
         self.ff_info['t'][1], self.ff_info['d'][1] = self.calc_right_config(self.ff_info['t'][0], self.ff_info['d'][0])
 
         self.obj_pos = {'x':0., 'y':0.} # Object Position
@@ -343,8 +343,8 @@ class FFEnv(object):
         # Input : none
         # Output : state
         # State : { theta_l, theta_r, O_x, O_y, (G-O)_x, (G-O)_y, done }
-        self.ff_info['t'][0] = radians(90)
-        self.ff_info['d'][0] = 35
+        self.ff_info['t'][0] = radians(190) # 90
+        self.ff_info['d'][0] = 35          # 35  
         self.ff_info['t'][1], self.ff_info['d'][1] = self.calc_right_config(self.ff_info['t'][0], self.ff_info['d'][0])
         
         # Goal location 

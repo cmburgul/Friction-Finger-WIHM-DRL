@@ -1,0 +1,12 @@
+
+ppo2_001.zip
+
+Multi goal
+
+Network Architecture : [256, 256] 
+
+Number of time_steps per episode : 256 
+
+Goal : Reward Engineered (negative befor reach and positive after reach) 
+
+

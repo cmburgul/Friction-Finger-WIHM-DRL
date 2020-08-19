@@ -51,8 +51,11 @@ class FFEnv(object):
     def step(self, action):
         done = False
         # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-        # action : Action is discrete
-        # 0 : a = [0 0]
+        # action : Action is Continuous
+        # a = [ Δθ_l Δθ_r f ]
+        
+        # Divide friction into 3 parts 
+        
         # 1 : a = [+Δθ 0]   Moving Left Finger in CCW -- Sliding on Right Finger Up  
         # 2 : a = [-Δθ 0]   Moving Left Finger in CW  -- Sliding on Right Finger Down
         # 3 : a = [0 +Δθ]   Moving Right Finger in CCW -- Sliding on Left Finger Down
